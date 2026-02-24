@@ -4,6 +4,7 @@ import type { ConvDoc, ContactDrawerData, UserDoc } from "./types";
 
 type ChatHeaderProps = {
   selectedConversation: ConvDoc;
+  selectedIsGroup: boolean;
   me: UserDoc;
   usersById: Map<string, UserDoc>;
   title: (conversation: ConvDoc) => string;
@@ -15,6 +16,7 @@ type ChatHeaderProps = {
 
 export function ChatHeader({
   selectedConversation,
+  selectedIsGroup,
   me,
   usersById,
   title,
@@ -32,7 +34,7 @@ export function ChatHeader({
       <button onClick={onBack} className="mr-2 rounded-md px-2 py-1 text-sm md:hidden">
         Back
       </button>
-      {selectedConversation.isGroup ? (
+      {selectedIsGroup ? (
         <div className="mr-3 flex h-10 w-10 items-center justify-center rounded-full bg-[#128c7e] text-sm font-semibold">
           {(selectedConversation.groupName || "G").slice(0, 2).toUpperCase()}
         </div>

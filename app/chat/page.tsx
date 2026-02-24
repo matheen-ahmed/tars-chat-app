@@ -24,6 +24,8 @@ import { REACTIONS, formatTimestamp, nearBottom } from "./components/utils";
 
 const PRESENCE_PING_MS = 15_000;
 const TYPING_IDLE_MS = 2_000;
+const isGroupConversation = (conversation: ConvDoc) =>
+  !!conversation.isGroup || !!conversation.groupName || conversation.participants.length > 2;
 
 export default function ChatPage() {
   const { user, isLoaded } = useUser();
@@ -38,6 +40,7 @@ export default function ChatPage() {
   } | null>(null);
   const [showNew, setShowNew] = useState(false);
   const [mobileList, setMobileList] = useState(true);
+  const [sidebarTab, setSidebarTab] = useState<"chats" | "groups">("chats");
   const [actionErr, setActionErr] = useState<string | null>(null);
   const [menuMsgId, setMenuMsgId] = useState<Id<"messages"> | null>(null);
   const [editingMessageId, setEditingMessageId] = useState<Id<"messages"> | null>(null);
@@ -197,16 +200,15 @@ export default function ChatPage() {
   const replyMessage = replyToId ? messagesById.get(String(replyToId)) || null : null;
   const forwardMessage =
     forwardMessageId ? messagesById.get(String(forwardMessageId)) || null : null;
-
   const title = (conversation: ConvDoc) =>
-    conversation.isGroup
+    isGroupConversation(conversation)
       ? conversation.groupName || "Unnamed Group"
       : usersById.get(
           String(conversation.participants.find((participant) => participant !== me?._id))
         )?.name || "Conversation";
 
   const subtitle = (conversation: ConvDoc) => {
-    if (conversation.isGroup) return `${conversation.participants.length} members`;
+    if (isGroupConversation(conversation)) return `${conversation.participants.length} members`;
     const other = usersById.get(
       String(conversation.participants.find((participant) => participant !== me?._id))
     );
@@ -243,6 +245,14 @@ export default function ChatPage() {
       return conversationTitle.toLowerCase().includes(query);
     });
   }, [conversations, me?._id, search, usersById]);
+  const filteredChatConversations = useMemo(
+    () => filteredConversations.filter((conversation) => !isGroupConversation(conversation)),
+    [filteredConversations]
+  );
+  const filteredGroupConversations = useMemo(
+    () => filteredConversations.filter((conversation) => isGroupConversation(conversation)),
+    [filteredConversations]
+  );
 
   const filteredGroupUsers = useMemo(() => {
     if (!users) return [];
@@ -252,6 +262,8 @@ export default function ChatPage() {
   }, [groupSearch, users]);
 
   const openConversation = (id: Id<"conversations">) => {
+    const target = conversations?.find((conversation) => conversation._id === id);
+    if (target) setSidebarTab(isGroupConversation(target) ? "groups" : "chats");
     setCid(id);
     setMobileList(false);
     setSendErr(false);
@@ -267,6 +279,7 @@ export default function ChatPage() {
 
   const openUserChat = async (targetUser: UserDoc) => {
     if (!me) return;
+    setSidebarTab("chats");
     const id = await getOrCreateConversation({ user1: me._id, user2: targetUser._id });
     openConversation(id);
   };
@@ -603,6 +616,7 @@ export default function ChatPage() {
         setGroupErr("Could not create group.");
         return;
       }
+      setSidebarTab("groups");
       setGroupOpen(false);
       setGroupName("");
       setGroupSearch("");
@@ -631,18 +645,22 @@ export default function ChatPage() {
   return (
     <div className="h-[100dvh] w-full overflow-hidden bg-[#0b141a] text-gray-100 md:grid md:grid-cols-[420px_1fr]">
       <Sidebar
+        activeTab={sidebarTab}
+        onTabChange={setSidebarTab}
         mobileList={mobileList}
         me={me}
         search={search}
         onSearchChange={setSearch}
         onOpenGroup={() => setGroupOpen(true)}
         loadingData={loadingData}
-        filteredConversations={filteredConversations}
+        chatConversations={filteredChatConversations}
+        groupConversations={filteredGroupConversations}
         filteredUsers={filteredUsers}
         selectedConversationId={cid}
         usersById={usersById}
         title={title}
         subtitle={subtitle}
+        isGroupConversation={isGroupConversation}
         onOpenConversation={openConversation}
         onOpenUserChat={(u) => void openUserChat(u)}
         onOpenContactDrawer={openContactDrawer}
@@ -657,6 +675,7 @@ export default function ChatPage() {
           <>
             <ChatHeader
               selectedConversation={selectedConv}
+              selectedIsGroup={isGroupConversation(selectedConv)}
               me={me}
               usersById={usersById}
               title={title}
