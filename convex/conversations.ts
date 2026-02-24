@@ -110,6 +110,52 @@ export const getMessages = query({
   },
 });
 
+export const renameGroup = mutation({
+  args: {
+    conversationId: v.id("conversations"),
+    userId: v.id("users"),
+    groupName: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const conversation = await ctx.db.get(args.conversationId);
+    if (!conversation) return false;
+    if (!conversation.isGroup) return false;
+    if (conversation.createdBy !== args.userId) return false;
+
+    const nextName = args.groupName.trim();
+    if (!nextName) return false;
+
+    await ctx.db.patch(args.conversationId, {
+      groupName: nextName,
+    });
+    return true;
+  },
+});
+
+export const deleteGroup = mutation({
+  args: {
+    conversationId: v.id("conversations"),
+    userId: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    const conversation = await ctx.db.get(args.conversationId);
+    if (!conversation) return false;
+    if (!conversation.isGroup) return false;
+    if (conversation.createdBy !== args.userId) return false;
+
+    const messages = await ctx.db
+      .query("messages")
+      .withIndex("by_conversation", (q) => q.eq("conversationId", args.conversationId))
+      .collect();
+
+    for (const message of messages) {
+      await ctx.db.delete(message._id);
+    }
+    await ctx.db.delete(args.conversationId);
+    return true;
+  },
+});
+
 export const generateUploadUrl = mutation({
   args: {},
   handler: async (ctx) => {
@@ -263,37 +309,37 @@ export const getConversations = query({
     );
 
     const now = Date.now();
-    const results: Array<(typeof myConversations)[number] & { unreadCount: number }> = [];
+    const results = await Promise.all(
+      myConversations.map(async (conv) => {
+        const seenRecord = conv.lastSeen?.find((ls) => ls.userId === args.userId);
+        const lastSeenTimestamp = seenRecord?.timestamp ?? 0;
 
-    for (const conv of myConversations) {
-      const seenRecord = conv.lastSeen?.find((ls) => ls.userId === args.userId);
-      const lastSeenTimestamp = seenRecord?.timestamp ?? 0;
+        const messages = await ctx.db
+          .query("messages")
+          .withIndex("by_conversation", (q) => q.eq("conversationId", conv._id))
+          .collect();
 
-      const messages = await ctx.db
-        .query("messages")
-        .withIndex("by_conversation", (q) => q.eq("conversationId", conv._id))
-        .collect();
+        const unreadCount = messages.filter(
+          (msg) => msg.senderId !== args.userId && msg.createdAt > lastSeenTimestamp
+        ).length;
 
-      const unreadCount = messages.filter(
-        (msg) => msg.senderId !== args.userId && msg.createdAt > lastSeenTimestamp
-      ).length;
+        const typingExpired =
+          conv.typing?.isTyping &&
+          now - conv.typing.updatedAt > TYPING_TIMEOUT_MS;
 
-      const typingExpired =
-        conv.typing?.isTyping &&
-        now - conv.typing.updatedAt > TYPING_TIMEOUT_MS;
-
-      results.push({
-        ...conv,
-        typing: typingExpired
-          ? {
-              userId: conv.typing!.userId,
-              isTyping: false,
-              updatedAt: conv.typing!.updatedAt,
-            }
-          : conv.typing,
-        unreadCount,
-      });
-    }
+        return {
+          ...conv,
+          typing: typingExpired && conv.typing
+            ? {
+                userId: conv.typing.userId,
+                isTyping: false,
+                updatedAt: conv.typing.updatedAt,
+              }
+            : conv.typing,
+          unreadCount,
+        };
+      })
+    );
 
     return results.sort(
       (a, b) => (b.lastMessageTime ?? 0) - (a.lastMessageTime ?? 0)

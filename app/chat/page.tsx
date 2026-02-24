@@ -1,6 +1,6 @@
 "use client";
 
-import { RedirectToSignIn, useUser } from "@clerk/nextjs";
+import { useUser } from "@clerk/nextjs";
 import { useMutation, useQuery } from "convex/react";
 import { X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
@@ -56,6 +56,10 @@ export default function ChatPage() {
   const [groupMembers, setGroupMembers] = useState<Id<"users">[]>([]);
   const [groupBusy, setGroupBusy] = useState(false);
   const [groupErr, setGroupErr] = useState<string | null>(null);
+  const [renameModalOpen, setRenameModalOpen] = useState(false);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [renameValue, setRenameValue] = useState("");
+  const [groupActionBusy, setGroupActionBusy] = useState(false);
   const [contactDrawer, setContactDrawer] = useState<ContactDrawerData | null>(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
   const [imagePreviewName, setImagePreviewName] = useState<string>("");
@@ -70,10 +74,13 @@ export default function ChatPage() {
   const heartbeat = useMutation(api.users.heartbeat);
   const getOrCreateConversation = useMutation(api.conversations.getOrCreateConversation);
   const createGroupConversation = useMutation(api.conversations.createGroupConversation);
+  const renameGroup = useMutation(api.conversations.renameGroup);
+  const deleteGroup = useMutation(api.conversations.deleteGroup);
   const sendMessage = useMutation(api.conversations.sendMessage);
   const generateUploadUrl = useMutation(api.conversations.generateUploadUrl);
   const generateProfileUploadUrl = useMutation(api.users.generateProfileUploadUrl);
   const updateProfileImage = useMutation(api.users.updateProfileImage);
+  const updateProfileName = useMutation(api.users.updateProfileName);
   const setTyping = useMutation(api.conversations.setTyping);
   const markAsRead = useMutation(api.conversations.markAsRead);
   const markMessagesAsSeen = useMutation(api.conversations.markMessagesAsSeen);
@@ -179,6 +186,13 @@ export default function ChatPage() {
     return () => document.removeEventListener("click", close);
   }, [menuMsgId]);
 
+  useEffect(() => {
+    setRenameModalOpen(false);
+    setDeleteModalOpen(false);
+    setRenameValue("");
+    setGroupActionBusy(false);
+  }, [cid]);
+
   const usersById = useMemo(() => {
     const map = new Map<string, UserDoc>();
     (users || []).forEach((u) => map.set(String(u._id), u));
@@ -224,6 +238,11 @@ export default function ChatPage() {
     }
     return "Typing...";
   })();
+  const canManageSelectedGroup =
+    !!selectedConv &&
+    isGroupConversation(selectedConv) &&
+    !!me &&
+    selectedConv.createdBy === me._id;
 
   const filteredUsers = useMemo(() => {
     if (!users) return [];
@@ -482,6 +501,25 @@ export default function ChatPage() {
     }
   };
 
+  const onUpdateProfileName = async (name: string) => {
+    if (!user) return false;
+    setActionErr(null);
+    try {
+      const ok = await updateProfileName({
+        clerkId: user.id,
+        name,
+      });
+      if (!ok) throw new Error("Update failed");
+      if (contactDrawer?.canEdit) {
+        setContactDrawer((prev) => (prev ? { ...prev, name: name.trim() } : prev));
+      }
+      return true;
+    } catch {
+      setActionErr("Could not update profile name.");
+      return false;
+    }
+  };
+
   const addMoreReaction = async (mid: Id<"messages">) => {
     const value = window.prompt(`Choose reaction: ${REACTIONS.join(" ")}`);
     if (!value) return;
@@ -629,15 +667,63 @@ export default function ChatPage() {
     }
   };
 
-  if (!isLoaded) {
+  const onRenameSelectedGroup = async () => {
+    if (!selectedConv || !me || !isGroupConversation(selectedConv)) return;
+    setRenameValue(selectedConv.groupName || "");
+    setRenameModalOpen(true);
+  };
+
+  const confirmRenameSelectedGroup = async () => {
+    if (!selectedConv || !me || !isGroupConversation(selectedConv) || groupActionBusy) return;
+    setGroupActionBusy(true);
+    const ok = await renameGroup({
+      conversationId: selectedConv._id,
+      userId: me._id,
+      groupName: renameValue,
+    });
+    if (!ok) {
+      setActionErr("Could not rename group.");
+    } else {
+      setRenameModalOpen(false);
+    }
+    setGroupActionBusy(false);
+  };
+
+  const onDeleteSelectedGroup = async () => {
+    if (!selectedConv || !me || !isGroupConversation(selectedConv)) return;
+    setDeleteModalOpen(true);
+  };
+
+  const confirmDeleteSelectedGroup = async () => {
+    if (!selectedConv || !me || !isGroupConversation(selectedConv) || groupActionBusy) return;
+    setGroupActionBusy(true);
+    const ok = await deleteGroup({
+      conversationId: selectedConv._id,
+      userId: me._id,
+    });
+    if (!ok) {
+      setActionErr("Could not delete group.");
+      setGroupActionBusy(false);
+      return;
+    }
+
+    setDeleteModalOpen(false);
+    setCid(null);
+    setMobileList(true);
+    setText("");
+    setReplyToId(null);
+    setMenuMsgId(null);
+    setShowNew(false);
+    setGroupActionBusy(false);
+  };
+
+  if (!isLoaded || !user) {
     return (
-      <div className="flex h-[100dvh] items-center justify-center bg-[#efeae2]">
-        <div className="h-10 w-10 animate-spin rounded-full border-4 border-[#1d9777] border-t-transparent" />
+      <div className="flex h-[100dvh] items-center justify-center bg-[#0b141a]">
+        <div className="h-10 w-10 animate-spin rounded-full border-4 border-[#16a34a] border-t-transparent" />
       </div>
     );
   }
-
-  if (!user) return <RedirectToSignIn />;
 
   const loadingData = !users || !me || !conversations;
   const loadingMessages = !!cid && messages === undefined;
@@ -676,6 +762,7 @@ export default function ChatPage() {
             <ChatHeader
               selectedConversation={selectedConv}
               selectedIsGroup={isGroupConversation(selectedConv)}
+              canManageGroup={canManageSelectedGroup}
               me={me}
               usersById={usersById}
               title={title}
@@ -683,6 +770,8 @@ export default function ChatPage() {
               typingText={typingText}
               onBack={() => setMobileList(true)}
               onOpenContactDrawer={openContactDrawer}
+              onRenameGroup={onRenameSelectedGroup}
+              onDeleteGroup={onDeleteSelectedGroup}
             />
 
             <MessageList
@@ -804,6 +893,7 @@ export default function ChatPage() {
         onClose={() => setContactDrawer(null)}
         profileInputRef={profileInputRef}
         onPickProfileImage={onPickProfileImage}
+        onUpdateProfileName={onUpdateProfileName}
       />
 
       {imagePreviewUrl && (
@@ -826,6 +916,62 @@ export default function ChatPage() {
               alt={imagePreviewName}
               className="max-h-[78vh] w-full rounded-lg object-contain"
             />
+          </div>
+        </div>
+      )}
+
+      {renameModalOpen && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-md rounded-xl border border-[#2b3942] bg-[#111b21] p-4 shadow-2xl">
+            <h3 className="text-base font-semibold text-[#e9edef]">Rename group</h3>
+            <p className="mt-1 text-sm text-[#aebac1]">Enter a new group name.</p>
+            <input
+              value={renameValue}
+              onChange={(event) => setRenameValue(event.target.value)}
+              placeholder="Group name"
+              className="mt-3 w-full rounded-lg border border-[#2b3942] bg-[#202c33] px-3 py-2 text-sm text-[#e9edef] outline-none placeholder:text-[#8696a0] focus:border-[#00a884]"
+            />
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                onClick={() => setRenameModalOpen(false)}
+                className="rounded-md border border-[#3b4a54] px-4 py-2 text-sm font-semibold text-[#d1d7db] hover:bg-[#1f2c34]"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => void confirmRenameSelectedGroup()}
+                disabled={groupActionBusy || !renameValue.trim()}
+                className="rounded-md bg-[#00a884] px-4 py-2 text-sm font-semibold text-white disabled:bg-[#2f655d]"
+              >
+                {groupActionBusy ? "Saving..." : "Save"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {deleteModalOpen && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-md rounded-xl border border-[#2b3942] bg-[#111b21] p-4 shadow-2xl">
+            <h3 className="text-base font-semibold text-[#e9edef]">Delete group</h3>
+            <p className="mt-1 text-sm text-[#aebac1]">
+              Delete this group for everyone? This cannot be undone.
+            </p>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                onClick={() => setDeleteModalOpen(false)}
+                className="rounded-md border border-[#3b4a54] px-4 py-2 text-sm font-semibold text-[#d1d7db] hover:bg-[#1f2c34]"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => void confirmDeleteSelectedGroup()}
+                disabled={groupActionBusy}
+                className="rounded-md bg-[#b42318] px-4 py-2 text-sm font-semibold text-white disabled:bg-[#7a2a26]"
+              >
+                {groupActionBusy ? "Deleting..." : "Delete"}
+              </button>
+            </div>
           </div>
         </div>
       )}

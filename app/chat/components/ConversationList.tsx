@@ -74,7 +74,7 @@ export function ConversationList({
               <button
                 key={conversation._id}
                 onClick={() => onOpenConversation(conversation._id)}
-                className={`flex w-full items-start gap-3 px-4 py-3 text-left transition hover:bg-[#202c33] ${
+                className={`flex w-full items-start gap-3 px-4 py-3 text-left transition-colors duration-150 hover:bg-[#253742] ${
                   selectedConversationId === conversation._id
                     ? "bg-[#2a3942]"
                     : "bg-[#111b21]"
@@ -116,12 +116,18 @@ export function ConversationList({
                           ? conversation.lastMessage
                           : "No messages yet"}
                       </p>
-                      <p className="truncate text-[11px] text-[#6d7d86]">
+                      <p
+                        className={`truncate ${
+                          conversationSubtitle === "Offline"
+                            ? "text-xs text-gray-400"
+                            : "text-[11px] text-[#6d7d86]"
+                        }`}
+                      >
                         {conversationSubtitle}
                       </p>
                     </div>
                     {conversation.unreadCount > 0 && (
-                      <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-[#00a884] px-2 py-0.5 text-xs font-semibold text-[#102126]">
+                      <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-[#128c7e] px-2 py-0.5 text-xs font-extrabold text-[#102126]">
                         {conversation.unreadCount}
                       </span>
                     )}
@@ -147,7 +153,7 @@ export function ConversationList({
               <button
                 key={user._id}
                 onClick={() => onOpenUserChat(user)}
-                className="flex w-full items-center gap-3 bg-[#111b21] px-4 py-3 text-left transition hover:bg-[#202c33]"
+                className="flex w-full items-center gap-3 bg-[#111b21] px-4 py-3 text-left transition-colors duration-150 hover:bg-[#253742]"
               >
                 <div className="relative">
                   <img
@@ -163,7 +169,7 @@ export function ConversationList({
                 </div>
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium text-[#e9edef]">{user.name}</p>
-                  <p className="truncate text-xs text-[#8696a0]">
+                  <p className="truncate text-xs text-gray-400">
                     {user.online ? "Online" : "Offline"}
                   </p>
                 </div>

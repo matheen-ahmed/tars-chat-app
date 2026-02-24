@@ -23,6 +23,7 @@ export const syncUser = mutation({
       await ctx.db.insert("users", {
         clerkId: args.clerkId,
         name: args.name,
+        nameEdited: false,
         email: args.email,
         image: args.image ?? "",
         online: true,
@@ -30,7 +31,7 @@ export const syncUser = mutation({
       });
     } else {
       await ctx.db.patch(existing._id, {
-        name: args.name,
+        name: existing.nameEdited ? existing.name : args.name,
         email: args.email,
         image:
           existing.imageStorageId || !args.image
@@ -77,6 +78,29 @@ export const getUsers = query({
           now - profile.lastActiveAt < ONLINE_WINDOW_MS,
       }))
     );
+  },
+});
+
+export const updateProfileName = mutation({
+  args: {
+    clerkId: v.string(),
+    name: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerkId", (q) => q.eq("clerkId", args.clerkId))
+      .unique();
+    if (!user) return false;
+
+    const nextName = args.name.trim();
+    if (!nextName) return false;
+
+    await ctx.db.patch(user._id, {
+      name: nextName,
+      nameEdited: true,
+    });
+    return true;
   },
 });
 

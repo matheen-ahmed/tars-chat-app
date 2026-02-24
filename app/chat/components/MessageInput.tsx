@@ -141,7 +141,7 @@ export function MessageInput({
         <button
           onClick={() => void onSend()}
           disabled={sending || !text.trim()}
-          className="rounded-full bg-[#00a884] px-5 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-[#2f655d]"
+          className="rounded-full bg-[#128c7e] px-5 py-2 text-sm font-semibold text-white transition-transform transition-colors hover:scale-105 hover:bg-green-600 disabled:cursor-not-allowed disabled:bg-[#2f655d] disabled:hover:scale-100"
         >
           {sending ? "Sending..." : editingMessageId ? "Save" : "Send"}
         </button>

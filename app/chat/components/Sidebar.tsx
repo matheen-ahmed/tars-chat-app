@@ -1,6 +1,6 @@
 "use client";
 
-import { Search } from "lucide-react";
+import { Search, UserCircle2 } from "lucide-react";
 import { UserButton } from "@clerk/nextjs";
 import Image from "next/image";
 import { ConversationList } from "./ConversationList";
@@ -48,6 +48,7 @@ export function Sidebar({
   isGroupConversation,
   onOpenConversation,
   onOpenUserChat,
+  onOpenContactDrawer,
 }: SidebarProps) {
   return (
     <aside
@@ -64,7 +65,25 @@ export function Sidebar({
           />
           <p className="truncate text-lg font-semibold">QuickChat</p>
         </div>
-        <UserButton afterSignOutUrl="/" />
+        <div className="flex items-center gap-2">
+          {me && (
+            <button
+              onClick={() =>
+                onOpenContactDrawer({
+                  name: me.name,
+                  image: me.image,
+                  detail: me.online ? "Online" : "Offline",
+                  canEdit: true,
+                })
+              }
+              className="inline-flex items-center gap-1 rounded-md border border-[#2b3942] px-2 py-1 text-xs font-semibold text-[#d1d7db] hover:bg-[#2a3942]"
+            >
+              <UserCircle2 className="h-4 w-4" />
+              <span>Profile</span>
+            </button>
+          )}
+          <UserButton afterSignOutUrl="/" />
+        </div>
       </div>
 
       <div className="space-y-3 border-b border-[#1f2c34] bg-[#111b21] px-4 py-4">

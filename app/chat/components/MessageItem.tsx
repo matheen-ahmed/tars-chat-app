@@ -134,10 +134,10 @@ export function MessageItem({
                 href={message.attachment.url}
                 target="_blank"
                 rel="noreferrer"
-                className="mb-2 flex items-center gap-2 rounded-lg border border-[#2b3942] bg-black/20 px-3 py-2 text-xs text-[#d1d7db]"
+                className="mb-2 flex items-center gap-2 rounded-lg border border-[#385366] bg-[#1a2a34] px-3 py-2 text-xs text-[#d1d7db] transition-colors hover:bg-[#223543]"
               >
-                <span className="text-base">Attachment</span>
-                <span className="truncate">{message.attachment.fileName}</span>
+                <span className="text-base" aria-hidden>{"\u{1F4CE}"}</span>
+                <span className="truncate hover:underline">{message.attachment.fileName}</span>
               </a>
             )}
 
@@ -202,3 +202,5 @@ export function MessageItem({
     </div>
   );
 }
+
+
