@@ -8,7 +8,11 @@ type ContactDrawerProps = {
   contactDrawer: ContactDrawerData | null;
   onClose: () => void;
   profileInputRef: RefObject<HTMLInputElement | null>;
-  onPickProfileImage: (event: ChangeEvent<HTMLInputElement>) => Promise<void>;
+  onPickProfileImage: (event: ChangeEvent<HTMLInputElement>) => void;
+  hasPendingProfileImage: boolean;
+  profileSaving: boolean;
+  onSaveProfileImage: () => Promise<void>;
+  onCancelProfileImage: () => void;
   onUpdateProfileName: (name: string) => Promise<boolean>;
 };
 
@@ -17,6 +21,10 @@ export function ContactDrawer({
   onClose,
   profileInputRef,
   onPickProfileImage,
+  hasPendingProfileImage,
+  profileSaving,
+  onSaveProfileImage,
+  onCancelProfileImage,
   onUpdateProfileName,
 }: ContactDrawerProps) {
   const [editing, setEditing] = useState(false);
@@ -87,6 +95,24 @@ export function ContactDrawer({
             >
               Change photo
             </button>
+          )}
+          {contactDrawer.canEdit && hasPendingProfileImage && (
+            <div className="mt-3 flex items-center gap-2">
+              <button
+                onClick={() => void onSaveProfileImage()}
+                disabled={profileSaving}
+                className="rounded-md bg-[#00a884] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#0abf9a] disabled:cursor-not-allowed disabled:bg-[#2f655d]"
+              >
+                {profileSaving ? "Saving..." : "Save photo"}
+              </button>
+              <button
+                onClick={onCancelProfileImage}
+                disabled={profileSaving}
+                className="rounded-md border border-[#3b4a54] px-3 py-1.5 text-xs font-semibold text-[#d1d7db] hover:bg-[#1f2c34] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Cancel
+              </button>
+            </div>
           )}
 
           {!editing ? (

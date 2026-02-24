@@ -61,6 +61,9 @@ export default function ChatPage() {
   const [renameValue, setRenameValue] = useState("");
   const [groupActionBusy, setGroupActionBusy] = useState(false);
   const [contactDrawer, setContactDrawer] = useState<ContactDrawerData | null>(null);
+  const [pendingProfileFile, setPendingProfileFile] = useState<File | null>(null);
+  const [pendingProfilePreview, setPendingProfilePreview] = useState<string | null>(null);
+  const [profileSaving, setProfileSaving] = useState(false);
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
   const [imagePreviewName, setImagePreviewName] = useState<string>("");
 
@@ -192,6 +195,12 @@ export default function ChatPage() {
     setRenameValue("");
     setGroupActionBusy(false);
   }, [cid]);
+
+  useEffect(() => {
+    return () => {
+      if (pendingProfilePreview) URL.revokeObjectURL(pendingProfilePreview);
+    };
+  }, [pendingProfilePreview]);
 
   const usersById = useMemo(() => {
     const map = new Map<string, UserDoc>();
@@ -466,7 +475,14 @@ export default function ChatPage() {
     void sendFile(file);
   };
 
-  const onPickProfileImage = async (event: ChangeEvent<HTMLInputElement>) => {
+  const resetPendingProfileImage = () => {
+    if (pendingProfilePreview) URL.revokeObjectURL(pendingProfilePreview);
+    setPendingProfilePreview(null);
+    setPendingProfileFile(null);
+    if (profileInputRef.current) profileInputRef.current.value = "";
+  };
+
+  const onPickProfileImage = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file || !user) return;
     if (!file.type.startsWith("image/")) {
@@ -475,14 +491,27 @@ export default function ChatPage() {
     }
 
     setActionErr(null);
+    if (pendingProfilePreview) URL.revokeObjectURL(pendingProfilePreview);
+    const localUrl = URL.createObjectURL(file);
+    setPendingProfileFile(file);
+    setPendingProfilePreview(localUrl);
+    if (contactDrawer?.canEdit) {
+      setContactDrawer((prev) => (prev ? { ...prev, image: localUrl } : prev));
+    }
+  };
+
+  const onSaveProfileImage = async () => {
+    if (!pendingProfileFile || !user || profileSaving) return;
+    setActionErr(null);
+    setProfileSaving(true);
     try {
       const uploadUrl = await generateProfileUploadUrl({});
       const uploadRes = await fetch(uploadUrl, {
         method: "POST",
         headers: {
-          "Content-Type": file.type || "application/octet-stream",
+          "Content-Type": pendingProfileFile.type || "application/octet-stream",
         },
-        body: file,
+        body: pendingProfileFile,
       });
       if (!uploadRes.ok) throw new Error("Upload failed");
 
@@ -490,14 +519,18 @@ export default function ChatPage() {
       const ok = await updateProfileImage({ clerkId: user.id, storageId });
       if (!ok) throw new Error("Update failed");
 
-      if (contactDrawer?.canEdit) {
-        const localUrl = URL.createObjectURL(file);
-        setContactDrawer((prev) => (prev ? { ...prev, image: localUrl } : prev));
-      }
+      resetPendingProfileImage();
     } catch {
       setActionErr("Could not update profile photo.");
     } finally {
-      if (profileInputRef.current) profileInputRef.current.value = "";
+      setProfileSaving(false);
+    }
+  };
+
+  const onCancelProfileImage = () => {
+    resetPendingProfileImage();
+    if (contactDrawer?.canEdit && me) {
+      setContactDrawer((prev) => (prev ? { ...prev, image: me.image } : prev));
     }
   };
 
@@ -629,7 +662,14 @@ export default function ChatPage() {
   const toggleGroupMember = (uid: Id<"users">) =>
     setGroupMembers((prev) => (prev.includes(uid) ? prev.filter((x) => x !== uid) : [...prev, uid]));
 
-  const openContactDrawer = (payload: ContactDrawerData) => setContactDrawer(payload);
+  const openContactDrawer = (payload: ContactDrawerData) => {
+    resetPendingProfileImage();
+    setContactDrawer(payload);
+  };
+  const closeContactDrawer = () => {
+    resetPendingProfileImage();
+    setContactDrawer(null);
+  };
 
   const createGroup = async () => {
     if (!me) return;
@@ -890,9 +930,13 @@ export default function ChatPage() {
 
       <ContactDrawer
         contactDrawer={contactDrawer}
-        onClose={() => setContactDrawer(null)}
+        onClose={closeContactDrawer}
         profileInputRef={profileInputRef}
         onPickProfileImage={onPickProfileImage}
+        hasPendingProfileImage={!!pendingProfileFile}
+        profileSaving={profileSaving}
+        onSaveProfileImage={onSaveProfileImage}
+        onCancelProfileImage={onCancelProfileImage}
         onUpdateProfileName={onUpdateProfileName}
       />
 
