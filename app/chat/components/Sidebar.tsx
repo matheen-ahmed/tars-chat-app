@@ -3,7 +3,10 @@
 import { Search } from "lucide-react";
 import { UserButton } from "@clerk/nextjs";
 import Image from "next/image";
+import { AvatarWithPresence } from "./AvatarWithPresence";
+import { TYPING_STALE_MS } from "../lib/constants";
 import { formatTimestamp } from "../lib/utils";
+import { getOtherParticipantId } from "../lib/conversationView";
 import type { ConvDoc, UserDoc } from "../lib/types";
 import type { Id } from "../../../convex/_generated/dataModel";
 
@@ -74,18 +77,7 @@ export function Sidebar({
         </h2>
         {me && (
           <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-black/20 px-3 py-2.5">
-            <div className="relative">
-              <img
-                src={me.image}
-                alt={me.name}
-                className="h-10 w-10 rounded-full object-cover"
-              />
-              <span
-                className={`absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-[#111b21] ${
-                  me.online ? "bg-green-500" : "bg-gray-400"
-                }`}
-              />
-            </div>
+            <AvatarWithPresence src={me.image} alt={me.name} online={me.online} />
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold text-[#e9edef]">
                 {me.name}
@@ -143,18 +135,13 @@ export function Sidebar({
           )}
           {!loadingData &&
             conversations.map((conversation) => {
-              const otherUser = usersById.get(
-                String(
-                  conversation.participants.find(
-                    (participant) => participant !== me?._id,
-                  ),
-                ),
-              );
+              const otherUserId = getOtherParticipantId(conversation, me?._id);
+              const otherUser = usersById.get(String(otherUserId));
               const isTyping =
                 !!conversation.typing?.isTyping &&
                 !!me &&
                 conversation.typing.userId !== me._id &&
-                typingNow - conversation.typing.updatedAt <= 2_000;
+                typingNow - conversation.typing.updatedAt <= TYPING_STALE_MS;
               const hasUnread = conversation.unreadCount > 0;
               return (
                 <button
@@ -166,18 +153,12 @@ export function Sidebar({
                       : "bg-[#111b21]"
                   }`}
                 >
-                  <div className="relative">
-                    <img
-                      src={otherUser?.image || ""}
-                      alt={conversationTitle(conversation)}
-                      className="h-11 w-11 rounded-full object-cover"
-                    />
-                    <span
-                      className={`absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-[#111b21] ${
-                        otherUser?.online ? "bg-green-500" : "bg-gray-400"
-                      }`}
-                    />
-                  </div>
+                  <AvatarWithPresence
+                    src={otherUser?.image || ""}
+                    alt={conversationTitle(conversation)}
+                    sizeClassName="h-11 w-11"
+                    online={otherUser?.online}
+                  />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0 flex-1">
@@ -243,18 +224,7 @@ export function Sidebar({
                 onClick={() => onOpenUserChat(user)}
                 className="flex w-full items-center gap-3 bg-[#111b21] px-4 py-3 text-left transition-colors duration-150 hover:bg-[#253742]"
               >
-                <div className="relative">
-                  <img
-                    src={user.image}
-                    alt={user.name}
-                    className="h-10 w-10 rounded-full object-cover"
-                  />
-                  <span
-                    className={`absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-[#111b21] ${
-                      user.online ? "bg-green-500" : "bg-gray-400"
-                    }`}
-                  />
-                </div>
+                <AvatarWithPresence src={user.image} alt={user.name} online={user.online} />
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium text-[#e9edef]">
                     {user.name}

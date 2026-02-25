@@ -5,6 +5,7 @@ import type { RefObject, UIEvent } from "react";
 import type { Id } from "../../../convex/_generated/dataModel";
 import type { ConvDoc, MessageUi, UserDoc } from "../lib/types";
 import { formatTimestamp } from "../lib/utils";
+import { AvatarWithPresence } from "./AvatarWithPresence";
 
 type ChatPanelProps = {
   showMobileList: boolean;
@@ -72,11 +73,13 @@ export function ChatPanel({
               <ArrowLeft className="h-5 w-5" />
             </button>
 
-            <img
-              src={otherUser?.image || ""}
-              alt={otherUser?.name || "User"}
-              className="mr-3 h-10 w-10 rounded-full object-cover"
-            />
+            <div className="mr-3">
+              <AvatarWithPresence
+                src={otherUser?.image || ""}
+                alt={otherUser?.name || "User"}
+                online={otherUser?.online}
+              />
+            </div>
             <div className="min-w-0 flex-1">
               <p className="truncate text-lg font-semibold text-[#e9edef]">
                 {conversationTitle(selectedConversation)}
