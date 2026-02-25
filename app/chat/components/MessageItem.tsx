@@ -8,7 +8,6 @@ import type { ConvDoc, MessageDoc, MessageUi, UserDoc } from "../lib/types";
 import { MessageMenu } from "./MessageMenu";
 
 type MessageItemProps = {
-  shouldAnimate: boolean;
   message: MessageUi;
   me: UserDoc;
   selectedConversation: ConvDoc;
@@ -35,7 +34,6 @@ type MessageItemProps = {
 };
 
 export function MessageItem({
-  shouldAnimate,
   message,
   me,
   selectedConversation,
@@ -94,7 +92,7 @@ export function MessageItem({
   return (
     <motion.div
       onClick={() => onToggleSelectedMessage(message._id)}
-      initial={reduceMotion || !shouldAnimate ? false : { opacity: 0, y: 10 }}
+      initial={reduceMotion ? false : { opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.2, ease: "easeOut" }}
       whileHover={reduceMotion ? undefined : { scale: 1.02 }}

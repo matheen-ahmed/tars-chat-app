@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, type RefObject } from "react";
+import type { RefObject } from "react";
 import type { Id } from "../../../convex/_generated/dataModel";
 import type { ConvDoc, MessageDoc, MessageUi, UserDoc } from "../lib/types";
 import { nearBottom } from "../lib/utils";
@@ -63,8 +63,6 @@ export function MessageList({
   onOpenImagePreview,
   onNearBottom,
 }: MessageListProps) {
-  const animatedMessageIdsRef = useRef<Set<string>>(new Set());
-
   return (
     <div
       ref={listRef}
@@ -90,16 +88,10 @@ export function MessageList({
 
         {messages?.map((message) => {
           if (message.deletedFor.includes(me._id)) return null;
-          const messageKey = String(message._id);
-          const shouldAnimate = !animatedMessageIdsRef.current.has(messageKey);
-          if (shouldAnimate) {
-            animatedMessageIdsRef.current.add(messageKey);
-          }
 
           return (
             <MessageItem
               key={message._id}
-              shouldAnimate={shouldAnimate}
               message={message}
               me={me}
               selectedConversation={selectedConversation}

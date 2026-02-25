@@ -2,16 +2,11 @@
 
 import { useUser } from "@clerk/nextjs";
 import { useMutation, useQuery } from "convex/react";
-import { X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
-import { ChatHeader } from "./components/ChatHeader";
-import { ContactDrawer } from "./components/ContactDrawer";
-import { ForwardModal } from "./components/ForwardModal";
-import { GroupModal } from "./components/GroupModal";
-import { MessageInput } from "./components/MessageInput";
-import { MessageList } from "./components/MessageList";
+import { ChatMainPanel } from "./components/ChatMainPanel";
+import { ChatOverlays } from "./components/ChatOverlays";
 import { Sidebar } from "./components/Sidebar";
 import type {
   ContactDrawerData,
@@ -816,147 +811,95 @@ export default function ChatPage() {
         onOpenContactDrawer={openContactDrawer}
       />
 
-      <main
-        className={`${!mobileList ? "flex" : "hidden"} h-full min-h-0 flex-col bg-[radial-gradient(120%_90%_at_50%_0%,rgba(67,94,117,0.18),rgba(7,12,18,0)_60%),linear-gradient(180deg,rgba(17,28,37,0.72)_0%,rgba(8,14,20,0.92)_100%)] px-2 pb-2 md:flex md:px-0 md:pb-0`}
-      >
-        {!selectedConv || !me ? (
-          <div className="flex h-full items-center justify-center px-8 text-center text-[#8696a0]">
-            <p>Select a conversation or user to start chatting.</p>
-          </div>
-        ) : (
-          <>
-            <ChatHeader
-              selectedConversation={selectedConv}
-              selectedIsGroup={isGroupConversation(selectedConv)}
-              canManageGroup={canManageSelectedGroup}
-              me={me}
-              usersById={usersById}
-              title={title}
-              subtitle={subtitle}
-              typingText={typingText}
-              onBack={() => setMobileList(true)}
-              onOpenContactDrawer={openContactDrawer}
-              onRenameGroup={onRenameSelectedGroup}
-              onDeleteGroup={onDeleteSelectedGroup}
-            />
+      <ChatMainPanel
+        mobileList={mobileList}
+        selectedConv={selectedConv}
+        me={me}
+        canManageSelectedGroup={canManageSelectedGroup}
+        usersById={usersById}
+        title={title}
+        subtitle={subtitle}
+        isGroupConversation={isGroupConversation}
+        typingText={typingText}
+        onBack={() => setMobileList(true)}
+        onOpenContactDrawer={openContactDrawer}
+        onRenameGroup={onRenameSelectedGroup}
+        onDeleteGroup={onDeleteSelectedGroup}
+        listRef={listRef}
+        loadingMessages={loadingMessages}
+        messages={messages}
+        messagesById={messagesById}
+        menuMsgId={menuMsgId}
+        onToggleMenu={setMenuMsgId}
+        selectMode={selectMode}
+        selectedMessageIds={selectedMessageIds}
+        onToggleSelectedMessage={toggleSelectedMessage}
+        onReact={react}
+        onAddMoreReaction={addMoreReaction}
+        onOpenInfo={openInfo}
+        onStartReply={startReply}
+        onCopyMessage={copyMessage}
+        onOpenForward={openForward}
+        onTogglePin={onTogglePin}
+        onToggleStar={onToggleStar}
+        onStartEdit={startEdit}
+        onToggleSelectMode={toggleSelectMode}
+        onDeleteForMe={delForMe}
+        onDeleteForEveryone={delForEveryone}
+        onOpenImagePreview={(url, name) => {
+          setImagePreviewUrl(url);
+          setImagePreviewName(name);
+        }}
+        onNearBottom={() => setShowNew(false)}
+        showNew={showNew}
+        onScrollToLatest={() => {
+          if (!listRef.current) return;
+          listRef.current.scrollTo({
+            top: listRef.current.scrollHeight,
+            behavior: "smooth",
+          });
+          setShowNew(false);
+        }}
+        onCopySelectedMessages={copySelectedMessages}
+        onDeleteSelectedForMe={deleteSelectedForMe}
+        onCancelSelectMode={cancelSelectMode}
+        actionErr={actionErr}
+        sendErr={sendErr}
+        sendRetry={sendRetry}
+        onRetrySend={send}
+        onDismissSendError={() => {
+          setSendErr(false);
+          setSendRetry(null);
+        }}
+        replyMessage={replyMessage}
+        onClearReply={() => setReplyToId(null)}
+        editingMessageId={editingMessageId}
+        onCancelEdit={cancelEdit}
+        fileInputRef={fileInputRef}
+        onPickFile={onPickFile}
+        text={text}
+        onType={onType}
+        onSend={() => send()}
+        sending={sending}
+      />
 
-            <MessageList
-              listRef={listRef}
-              loadingMessages={loadingMessages}
-              messages={messages}
-              me={me}
-              selectedConversation={selectedConv}
-              usersById={usersById}
-              messagesById={messagesById}
-              menuMsgId={menuMsgId}
-              onToggleMenu={setMenuMsgId}
-              selectMode={selectMode}
-              selectedMessageIds={selectedMessageIds}
-              onToggleSelectedMessage={toggleSelectedMessage}
-              onReact={react}
-              onAddMoreReaction={addMoreReaction}
-              onOpenInfo={openInfo}
-              onStartReply={startReply}
-              onCopyMessage={copyMessage}
-              onOpenForward={openForward}
-              onTogglePin={onTogglePin}
-              onToggleStar={onToggleStar}
-              onStartEdit={startEdit}
-              onToggleSelectMode={toggleSelectMode}
-              onDeleteForMe={delForMe}
-              onDeleteForEveryone={delForEveryone}
-              onOpenImagePreview={(url, name) => {
-                setImagePreviewUrl(url);
-                setImagePreviewName(name);
-              }}
-              onNearBottom={() => setShowNew(false)}
-            />
-
-            {showNew && (
-              <button
-                onClick={() => {
-                  if (!listRef.current) return;
-                  listRef.current.scrollTo({
-                    top: listRef.current.scrollHeight,
-                    behavior: "smooth",
-                  });
-                  setShowNew(false);
-                }}
-                className="mx-auto -mt-14 mb-2 rounded-full bg-[#25d366] px-4 py-2 text-sm font-medium text-white shadow-md"
-              >
-                New messages
-              </button>
-            )}
-
-            <MessageInput
-              selectMode={selectMode}
-              selectedMessageIds={selectedMessageIds}
-              onCopySelectedMessages={copySelectedMessages}
-              onDeleteSelectedForMe={deleteSelectedForMe}
-              onCancelSelectMode={cancelSelectMode}
-              actionErr={actionErr}
-              sendErr={sendErr}
-              sendRetry={sendRetry}
-              onRetrySend={send}
-              onDismissSendError={() => {
-                setSendErr(false);
-                setSendRetry(null);
-              }}
-              replyMessage={replyMessage}
-              onClearReply={() => setReplyToId(null)}
-              editingMessageId={editingMessageId}
-              onCancelEdit={cancelEdit}
-              fileInputRef={fileInputRef}
-              onPickFile={onPickFile}
-              text={text}
-              onType={onType}
-              onSend={() => send()}
-              sending={sending}
-            />
-          </>
-        )}
-      </main>
-
-      {infoMessage && (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-sm rounded-xl bg-white p-4 shadow-xl">
-            <h3 className="text-sm font-semibold text-gray-900">Message info</h3>
-            <p className="mt-2 text-xs text-gray-500">
-              Sent by: {usersById.get(String(infoMessage.senderId))?.name || "Unknown"}
-            </p>
-            <p className="text-xs text-gray-500">Time: {formatTimestamp(infoMessage.createdAt)}</p>
-            <p className="text-xs text-gray-500">Seen by: {infoMessage.seenBy.length}</p>
-            <div className="mt-3 rounded-md bg-gray-50 p-2 text-sm text-gray-700">
-              {infoMessage.content}
-            </div>
-            <div className="mt-4 flex justify-end">
-              <button
-                onClick={() => setInfoMessageId(null)}
-                className="rounded bg-[#25d366] px-3 py-1.5 text-xs font-semibold text-white"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <ForwardModal
-        open={forwardOpen}
+      <ChatOverlays
+        infoMessage={infoMessage}
+        usersById={usersById}
+        formatTimestamp={formatTimestamp}
+        onCloseInfo={() => setInfoMessageId(null)}
+        forwardOpen={forwardOpen}
         conversations={conversations || []}
         users={users || []}
         title={title}
         onForwardToConversation={forwardToConversation}
         onForwardToUser={forwardToUser}
-        onClose={() => {
+        onCloseForward={() => {
           setForwardOpen(false);
           setForwardMessageId(null);
         }}
-      />
-
-      <ContactDrawer
         contactDrawer={contactDrawer}
-        onClose={closeContactDrawer}
+        onCloseContactDrawer={closeContactDrawer}
         profileInputRef={profileInputRef}
         onPickProfileImage={onPickProfileImage}
         hasPendingProfileImage={!!pendingProfileFile}
@@ -964,90 +907,19 @@ export default function ChatPage() {
         onSaveProfileImage={onSaveProfileImage}
         onCancelProfileImage={onCancelProfileImage}
         onUpdateProfileName={onUpdateProfileName}
-      />
-
-      {imagePreviewUrl && (
-        <div
-          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-4"
-          onClick={() => setImagePreviewUrl(null)}
-        >
-          <div className="relative w-full max-w-5xl" onClick={(event) => event.stopPropagation()}>
-            <div className="mb-2 flex items-center justify-between rounded-lg bg-[#111b21] px-3 py-2 text-white">
-              <p className="truncate text-sm text-[#d1d7db]">{imagePreviewName}</p>
-              <button
-                onClick={() => setImagePreviewUrl(null)}
-                className="rounded-full p-1 text-[#d1d7db] hover:bg-white/10 hover:text-white"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-            <img
-              src={imagePreviewUrl}
-              alt={imagePreviewName}
-              className="max-h-[78vh] w-full rounded-lg object-contain"
-            />
-          </div>
-        </div>
-      )}
-
-      {renameModalOpen && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 p-4">
-          <div className="w-full max-w-md rounded-xl border border-[#2b3942] bg-[#111b21] p-4 shadow-2xl">
-            <h3 className="text-base font-semibold text-[#e9edef]">Rename group</h3>
-            <p className="mt-1 text-sm text-[#aebac1]">Enter a new group name.</p>
-            <input
-              value={renameValue}
-              onChange={(event) => setRenameValue(event.target.value)}
-              placeholder="Group name"
-              className="mt-3 w-full rounded-lg border border-[#2b3942] bg-[#202c33] px-3 py-2 text-sm text-[#e9edef] outline-none placeholder:text-[#8696a0] focus:border-[#00a884]"
-            />
-            <div className="mt-4 flex justify-end gap-2">
-              <button
-                onClick={() => setRenameModalOpen(false)}
-                className="rounded-md border border-[#3b4a54] px-4 py-2 text-sm font-semibold text-[#d1d7db] hover:bg-[#1f2c34]"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => void confirmRenameSelectedGroup()}
-                disabled={groupActionBusy || !renameValue.trim()}
-                className="rounded-md bg-[#00a884] px-4 py-2 text-sm font-semibold text-white disabled:bg-[#2f655d]"
-              >
-                {groupActionBusy ? "Saving..." : "Save"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {deleteModalOpen && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 p-4">
-          <div className="w-full max-w-md rounded-xl border border-[#2b3942] bg-[#111b21] p-4 shadow-2xl">
-            <h3 className="text-base font-semibold text-[#e9edef]">Delete group</h3>
-            <p className="mt-1 text-sm text-[#aebac1]">
-              Delete this group for everyone? This cannot be undone.
-            </p>
-            <div className="mt-4 flex justify-end gap-2">
-              <button
-                onClick={() => setDeleteModalOpen(false)}
-                className="rounded-md border border-[#3b4a54] px-4 py-2 text-sm font-semibold text-[#d1d7db] hover:bg-[#1f2c34]"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => void confirmDeleteSelectedGroup()}
-                disabled={groupActionBusy}
-                className="rounded-md bg-[#b42318] px-4 py-2 text-sm font-semibold text-white disabled:bg-[#7a2a26]"
-              >
-                {groupActionBusy ? "Deleting..." : "Delete"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <GroupModal
-        open={groupOpen}
+        imagePreviewUrl={imagePreviewUrl}
+        imagePreviewName={imagePreviewName}
+        onCloseImagePreview={() => setImagePreviewUrl(null)}
+        renameModalOpen={renameModalOpen}
+        renameValue={renameValue}
+        onRenameValueChange={setRenameValue}
+        onCloseRenameModal={() => setRenameModalOpen(false)}
+        onConfirmRenameGroup={confirmRenameSelectedGroup}
+        groupActionBusy={groupActionBusy}
+        deleteModalOpen={deleteModalOpen}
+        onCloseDeleteModal={() => setDeleteModalOpen(false)}
+        onConfirmDeleteGroup={confirmDeleteSelectedGroup}
+        groupOpen={groupOpen}
         groupName={groupName}
         onGroupNameChange={setGroupName}
         groupSearch={groupSearch}
@@ -1057,12 +929,12 @@ export default function ChatPage() {
         onToggleGroupMember={toggleGroupMember}
         groupErr={groupErr}
         groupBusy={groupBusy}
-        onClose={() => {
+        onCloseGroupModal={() => {
           setGroupOpen(false);
           setGroupErr(null);
           setGroupSearch("");
         }}
-        onCreate={createGroup}
+        onCreateGroup={createGroup}
       />
     </div>
   );
