@@ -17,7 +17,8 @@ export default function ChatPage() {
   const { user, isLoaded } = useUser();
 
   const [search, setSearch] = useState("");
-  const [conversationId, setConversationId] = useState<Id<"conversations"> | null>(null);
+  const [conversationId, setConversationId] =
+    useState<Id<"conversations"> | null>(null);
   const [showMobileList, setShowMobileList] = useState(true);
   const [messageText, setMessageText] = useState("");
   const [isSending, setIsSending] = useState(false);
@@ -29,7 +30,9 @@ export default function ChatPage() {
   const [isNearBottomState, setIsNearBottomState] = useState(true);
   const [isDesktop, setIsDesktop] = useState(false);
   const [isWindowActive, setIsWindowActive] = useState(() =>
-    typeof document !== "undefined" ? document.visibilityState === "visible" : true
+    typeof document !== "undefined"
+      ? document.visibilityState === "visible"
+      : true,
   );
 
   const listRef = useRef<HTMLDivElement | null>(null);
@@ -39,26 +42,31 @@ export default function ChatPage() {
   const syncUser = useMutation(api.users.syncUser);
   const setOnline = useMutation(api.users.setOnlineStatus);
   const heartbeat = useMutation(api.users.heartbeat);
-  const getOrCreateConversation = useMutation(api.conversations.getOrCreateConversation);
+  const getOrCreateConversation = useMutation(
+    api.conversations.getOrCreateConversation,
+  );
   const sendMessage = useMutation(api.conversations.sendMessage);
   const setTyping = useMutation(api.conversations.setTyping);
   const markAsRead = useMutation(api.conversations.markAsRead);
-  const backfillConversationsForUser = useMutation(api.conversations.backfillConversationsForUser);
+  const backfillConversationsForUser = useMutation(
+    api.conversations.backfillConversationsForUser,
+  );
 
-  const users = useQuery(api.users.getUsers, user ? { clerkId: user.id } : "skip") as
-    | UserDoc[]
-    | undefined;
-  const me = useQuery(api.users.getCurrentUser, user ? { clerkId: user.id } : "skip") as
-    | UserDoc
-    | null
-    | undefined;
+  const users = useQuery(
+    api.users.getUsers,
+    user ? { clerkId: user.id } : "skip",
+  ) as UserDoc[] | undefined;
+  const me = useQuery(
+    api.users.getCurrentUser,
+    user ? { clerkId: user.id } : "skip",
+  ) as UserDoc | null | undefined;
   const conversations = useQuery(
     api.conversations.getConversations,
-    me ? { userId: me._id } : "skip"
+    me ? { userId: me._id } : "skip",
   ) as ConvDoc[] | undefined;
   const messages = useQuery(
     api.conversations.getMessages,
-    conversationId ? { conversationId } : "skip"
+    conversationId ? { conversationId } : "skip",
   ) as MessageUi[] | undefined;
 
   const syncCurrentUser = useCallback(async () => {
@@ -103,7 +111,10 @@ export default function ChatPage() {
     };
 
     onOnline();
-    const ping = window.setInterval(() => void heartbeat({ clerkId: user.id }), PRESENCE_PING_MS);
+    const ping = window.setInterval(
+      () => void heartbeat({ clerkId: user.id }),
+      PRESENCE_PING_MS,
+    );
     const onVisibilityChange = () =>
       document.visibilityState === "visible" ? onOnline() : onOffline();
 
@@ -129,26 +140,30 @@ export default function ChatPage() {
   const directConversations = useMemo(
     () =>
       (conversations || []).filter(
-        (conversation) => conversation.participants.length === 2
+        (conversation) => conversation.participants.length === 2,
       ),
-    [conversations]
+    [conversations],
   );
 
   const conversationTitle = useCallback(
     (conversation: ConvDoc) => {
-      const otherId = conversation.participants.find((participant) => participant !== me?._id);
+      const otherId = conversation.participants.find(
+        (participant) => participant !== me?._id,
+      );
       return usersById.get(String(otherId))?.name || "Conversation";
     },
-    [me?._id, usersById]
+    [me?._id, usersById],
   );
 
   const conversationSubtitle = useCallback(
     (conversation: ConvDoc) => {
-      const otherId = conversation.participants.find((participant) => participant !== me?._id);
+      const otherId = conversation.participants.find(
+        (participant) => participant !== me?._id,
+      );
       const other = usersById.get(String(otherId));
       return other?.online ? "Online" : "Offline";
     },
-    [me?._id, usersById]
+    [me?._id, usersById],
   );
 
   const filteredConversations = useMemo(() => {
@@ -156,7 +171,7 @@ export default function ChatPage() {
     if (!query) return directConversations;
 
     return directConversations.filter((conversation) =>
-      conversationTitle(conversation).toLowerCase().includes(query)
+      conversationTitle(conversation).toLowerCase().includes(query),
     );
   }, [conversationTitle, directConversations, search]);
 
@@ -164,23 +179,31 @@ export default function ChatPage() {
     const query = search.trim().toLowerCase();
     if (!users) return [];
     if (!query) return users;
-    return users.filter((profile) => profile.name.toLowerCase().includes(query));
+    return users.filter((profile) =>
+      profile.name.toLowerCase().includes(query),
+    );
   }, [search, users]);
 
   const selectedConversation = useMemo(
-    () => directConversations.find((conversation) => conversation._id === conversationId) ?? null,
-    [conversationId, directConversations]
+    () =>
+      directConversations.find(
+        (conversation) => conversation._id === conversationId,
+      ) ?? null,
+    [conversationId, directConversations],
   );
 
   const otherUser = useMemo(() => {
     if (!selectedConversation || !me) return null;
-    const otherId = selectedConversation.participants.find((participant) => participant !== me._id);
+    const otherId = selectedConversation.participants.find(
+      (participant) => participant !== me._id,
+    );
     return usersById.get(String(otherId)) || null;
   }, [me, selectedConversation, usersById]);
 
   const typingText = useMemo(() => {
     if (!selectedConversation?.typing?.isTyping || !me) return "";
-    if (typingNow - selectedConversation.typing.updatedAt > TYPING_IDLE_MS) return "";
+    if (typingNow - selectedConversation.typing.updatedAt > TYPING_IDLE_MS)
+      return "";
     if (selectedConversation.typing.userId === me._id) return "";
 
     const typer = usersById.get(String(selectedConversation.typing.userId));
@@ -202,7 +225,9 @@ export default function ChatPage() {
 
   useEffect(() => {
     const updateActiveState = () =>
-      setIsWindowActive(document.visibilityState === "visible" && document.hasFocus());
+      setIsWindowActive(
+        document.visibilityState === "visible" && document.hasFocus(),
+      );
 
     updateActiveState();
     document.addEventListener("visibilitychange", updateActiveState);
@@ -225,12 +250,15 @@ export default function ChatPage() {
 
   const messageCount = messages?.length ?? 0;
   const isConversationVisible =
-    !!conversationId && !!me && (isDesktop || !showMobileList) && isWindowActive;
+    !!conversationId &&
+    !!me &&
+    (isDesktop || !showMobileList) &&
+    isWindowActive;
 
   useEffect(() => {
     if (!conversationId || !me || !isConversationVisible) return;
     void markAsRead({ conversationId, userId: me._id });
-  }, [conversationId, isConversationVisible, markAsRead, me]);
+  }, [conversationId, isConversationVisible, markAsRead, me, messageCount]);
 
   useEffect(() => {
     if (!listRef.current || messageCount === 0) return;
@@ -239,7 +267,10 @@ export default function ChatPage() {
     prevMessageCountRef.current = messageCount;
 
     if (isInitialLoad || (hasNewMessages && isNearBottomState)) {
-      listRef.current.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
+      listRef.current.scrollTo({
+        top: listRef.current.scrollHeight,
+        behavior: "smooth",
+      });
       setShowNewMessages(false);
       return;
     }
@@ -256,13 +287,17 @@ export default function ChatPage() {
       if (typingTimeoutRef.current) {
         window.clearTimeout(typingTimeoutRef.current);
       }
-      void setTyping({ conversationId, userId: me._id, isTyping: false }).catch(() => {});
+      void setTyping({ conversationId, userId: me._id, isTyping: false }).catch(
+        () => {},
+      );
     };
   }, [conversationId, me, setTyping]);
 
   useEffect(() => {
     if (!conversationId) return;
-    const stillExists = directConversations.some((conversation) => conversation._id === conversationId);
+    const stillExists = directConversations.some(
+      (conversation) => conversation._id === conversationId,
+    );
     if (stillExists) return;
 
     setConversationId(null);
@@ -284,7 +319,10 @@ export default function ChatPage() {
 
   const openUserChat = async (targetUser: UserDoc) => {
     if (!me) return;
-    const id = await getOrCreateConversation({ user1: me._id, user2: targetUser._id });
+    const id = await getOrCreateConversation({
+      user1: me._id,
+      user2: targetUser._id,
+    });
     openConversation(id);
   };
 
@@ -297,16 +335,22 @@ export default function ChatPage() {
       if (typingTimeoutRef.current) {
         window.clearTimeout(typingTimeoutRef.current);
       }
-      void setTyping({ conversationId, userId: me._id, isTyping: false }).catch(() => {});
+      void setTyping({ conversationId, userId: me._id, isTyping: false }).catch(
+        () => {},
+      );
       return;
     }
 
-    void setTyping({ conversationId, userId: me._id, isTyping: true }).catch(() => {});
+    void setTyping({ conversationId, userId: me._id, isTyping: true }).catch(
+      () => {},
+    );
     if (typingTimeoutRef.current) {
       window.clearTimeout(typingTimeoutRef.current);
     }
     typingTimeoutRef.current = window.setTimeout(() => {
-      void setTyping({ conversationId, userId: me._id, isTyping: false }).catch(() => {});
+      void setTyping({ conversationId, userId: me._id, isTyping: false }).catch(
+        () => {},
+      );
     }, TYPING_IDLE_MS);
   };
 
@@ -328,10 +372,17 @@ export default function ChatPage() {
         return;
       }
 
-      await setTyping({ conversationId, userId: me._id, isTyping: false }).catch(() => {});
+      await setTyping({
+        conversationId,
+        userId: me._id,
+        isTyping: false,
+      }).catch(() => {});
       setMessageText("");
       if (listRef.current) {
-        listRef.current.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
+        listRef.current.scrollTo({
+          top: listRef.current.scrollHeight,
+          behavior: "smooth",
+        });
       }
       setShowNewMessages(false);
     } catch {
@@ -349,7 +400,10 @@ export default function ChatPage() {
     );
   }
 
-  const isLoadingData = users === undefined || me === undefined || (!!me && conversations === undefined);
+  const isLoadingData =
+    users === undefined ||
+    me === undefined ||
+    (!!me && conversations === undefined);
   const isLoadingMessages = !!conversationId && messages === undefined;
 
   return (
@@ -414,7 +468,9 @@ export default function ChatPage() {
                   </p>
                 ) : (
                   <div className="flex items-center gap-2 text-xs text-[#9bb5c3]">
-                    <span className="truncate">{typingText.replace(/\.\.\.$/, "")}</span>
+                    <span className="truncate">
+                      {typingText.replace(/\.\.\.$/, "")}
+                    </span>
                     <span className="flex items-end gap-1">
                       <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-gray-400 [animation-delay:-0.2s]" />
                       <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-gray-400 [animation-delay:-0.1s]" />
@@ -440,7 +496,10 @@ export default function ChatPage() {
                 {isLoadingMessages && (
                   <div className="space-y-2">
                     {Array.from({ length: 8 }).map((_, index) => (
-                      <div key={index} className={`flex ${index % 2 === 0 ? "justify-start" : "justify-end"}`}>
+                      <div
+                        key={index}
+                        className={`flex ${index % 2 === 0 ? "justify-start" : "justify-end"}`}
+                      >
                         <div className="h-14 w-48 animate-pulse rounded-xl bg-white/70" />
                       </div>
                     ))}
@@ -456,7 +515,10 @@ export default function ChatPage() {
                 {messages?.map((message) => {
                   const isMine = message.senderId === me._id;
                   return (
-                    <div key={message._id} className={`flex ${isMine ? "justify-end" : "justify-start"}`}>
+                    <div
+                      key={message._id}
+                      className={`flex ${isMine ? "justify-end" : "justify-start"}`}
+                    >
                       <div
                         className={`max-w-[82%] rounded-2xl border px-3.5 py-2.5 text-sm shadow-[0_10px_28px_rgba(0,0,0,0.28)] md:max-w-[62%] ${
                           isMine
@@ -464,7 +526,9 @@ export default function ChatPage() {
                             : "border-[#2a3942]/80 bg-[linear-gradient(145deg,rgba(34,47,57,0.9),rgba(26,37,46,0.92))]"
                         }`}
                       >
-                        <p className="break-words text-[#e9edef]">{message.content}</p>
+                        <p className="break-words text-[#e9edef]">
+                          {message.content}
+                        </p>
                         <p className="mt-1 text-right text-[11px] text-[#aebac1]">
                           {formatTimestamp(message.createdAt)}
                         </p>
@@ -479,7 +543,10 @@ export default function ChatPage() {
               <button
                 onClick={() => {
                   if (!listRef.current) return;
-                  listRef.current.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
+                  listRef.current.scrollTo({
+                    top: listRef.current.scrollHeight,
+                    behavior: "smooth",
+                  });
                   setShowNewMessages(false);
                 }}
                 className="mx-auto -mt-14 mb-2 rounded-full bg-[#25d366] px-4 py-2 text-sm font-medium text-white shadow-md"
@@ -489,14 +556,22 @@ export default function ChatPage() {
             )}
 
             <footer className="border-t border-[#1f2c34] bg-[#202c33] p-3">
-              {sendError && <p className="mb-2 text-center text-xs text-red-400">{sendError}</p>}
+              {sendError && (
+                <p className="mb-2 text-center text-xs text-red-400">
+                  {sendError}
+                </p>
+              )}
               <div className="mx-auto flex w-full max-w-3xl min-w-0 items-center gap-2">
                 <input
                   value={messageText}
                   onChange={(event) => onType(event.target.value)}
                   onBlur={() => {
                     if (!conversationId || !me) return;
-                    void setTyping({ conversationId, userId: me._id, isTyping: false }).catch(() => {});
+                    void setTyping({
+                      conversationId,
+                      userId: me._id,
+                      isTyping: false,
+                    }).catch(() => {});
                   }}
                   onKeyDown={(event) => {
                     if (event.key === "Enter" && !event.shiftKey) {
@@ -522,5 +597,3 @@ export default function ChatPage() {
     </div>
   );
 }
-
-
