@@ -118,10 +118,10 @@ export function MessageInput({
         </div>
       )}
 
-      <div className="mx-auto flex max-w-3xl items-center gap-2">
+      <div className="mx-auto flex w-full max-w-3xl min-w-0 items-center gap-2">
         <button
           onClick={() => fileInputRef.current?.click()}
-          className="rounded-full bg-[#111b21] p-2 text-[#d1d7db] hover:text-white"
+          className="shrink-0 rounded-full bg-[#111b21] p-2 text-[#d1d7db] hover:text-white"
         >
           <PlusCircle className="h-5 w-5" />
         </button>
@@ -136,12 +136,12 @@ export function MessageInput({
             }
           }}
           placeholder="Type a message"
-          className="flex-1 rounded-full border border-[#2b3942] bg-[#111b21] px-4 py-2 text-sm text-[#d1d7db] outline-none focus:border-[#00a884]"
+          className="min-w-0 flex-1 rounded-full border border-[#2b3942] bg-[#111b21] px-4 py-2 text-sm text-[#d1d7db] outline-none focus:border-[#00a884]"
         />
         <button
           onClick={() => void onSend()}
           disabled={sending || !text.trim()}
-          className="rounded-full bg-[#128c7e] px-5 py-2 text-sm font-semibold text-white transition-transform transition-colors hover:scale-105 hover:bg-green-600 disabled:cursor-not-allowed disabled:bg-[#2f655d] disabled:hover:scale-100"
+          className="shrink-0 rounded-full bg-[#128c7e] px-4 py-2 text-sm font-semibold text-white transition-transform transition-colors hover:scale-105 hover:bg-green-600 md:px-5 disabled:cursor-not-allowed disabled:bg-[#2f655d] disabled:hover:scale-100"
         >
           {sending ? "Sending..." : editingMessageId ? "Save" : "Send"}
         </button>
