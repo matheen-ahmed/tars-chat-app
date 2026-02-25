@@ -1,7 +1,19 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
+import type { Id } from "./_generated/dataModel";
 
 const TYPING_TIMEOUT_MS = 2_000;
+
+const normalizeParticipants = (user1: Id<"users">, user2: Id<"users">) => {
+  const [participantA, participantB] =
+    String(user1) < String(user2) ? [user1, user2] : [user2, user1];
+  return { participantA, participantB };
+};
+
+const buildConversationKey = (user1: Id<"users">, user2: Id<"users">) => {
+  const { participantA, participantB } = normalizeParticipants(user1, user2);
+  return `${String(participantA)}:${String(participantB)}`;
+};
 
 export const getOrCreateConversation = mutation({
   args: {
@@ -9,14 +21,12 @@ export const getOrCreateConversation = mutation({
     user2: v.id("users"),
   },
   handler: async (ctx, args) => {
-    const conversations = await ctx.db.query("conversations").collect();
-
-    const existing = conversations.find(
-      (conversation) =>
-        conversation.participants.length === 2 &&
-        conversation.participants.includes(args.user1) &&
-        conversation.participants.includes(args.user2)
-    );
+    const { participantA, participantB } = normalizeParticipants(args.user1, args.user2);
+    const conversationKey = buildConversationKey(args.user1, args.user2);
+    const existing = await ctx.db
+      .query("conversations")
+      .withIndex("by_conversationKey", (q) => q.eq("conversationKey", conversationKey))
+      .unique();
 
     if (existing) {
       return existing._id;
@@ -24,18 +34,16 @@ export const getOrCreateConversation = mutation({
 
     const now = Date.now();
     return await ctx.db.insert("conversations", {
-      participants: [args.user1, args.user2],
+      conversationKey,
+      participantA,
+      participantB,
+      participants: [participantA, participantB],
       lastMessage: "",
       lastMessageTime: now,
       lastSeen: [
-        { userId: args.user1, timestamp: now },
-        { userId: args.user2, timestamp: now },
+        { userId: participantA, timestamp: now },
+        { userId: participantB, timestamp: now },
       ],
-      typing: {
-        userId: args.user1,
-        isTyping: false,
-        updatedAt: now,
-      },
     });
   },
 });
@@ -97,10 +105,24 @@ export const getConversations = query({
     userId: v.id("users"),
   },
   handler: async (ctx, args) => {
-    const allConversations = await ctx.db.query("conversations").collect();
-    const myConversations = allConversations.filter((conversation) =>
-      conversation.participants.includes(args.userId)
+    const [asParticipantA, asParticipantB] = await Promise.all([
+      ctx.db
+        .query("conversations")
+        .withIndex("by_participantA", (q) => q.eq("participantA", args.userId))
+        .collect(),
+      ctx.db
+        .query("conversations")
+        .withIndex("by_participantB", (q) => q.eq("participantB", args.userId))
+        .collect(),
+    ]);
+
+    const conversationMap = new Map(
+      asParticipantA.map((conversation) => [String(conversation._id), conversation])
     );
+    for (const conversation of asParticipantB) {
+      conversationMap.set(String(conversation._id), conversation);
+    }
+    const myConversations = Array.from(conversationMap.values());
 
     const now = Date.now();
     const results = await Promise.all(

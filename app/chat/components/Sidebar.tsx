@@ -67,11 +67,17 @@ export function Sidebar({
       </div>
 
       <div className="space-y-3 border-b border-white/10 bg-white/[0.03] px-4 py-4.5">
-        <h2 className="text-4xl font-semibold tracking-tight text-white">Chats</h2>
+        <h2 className="text-4xl font-semibold tracking-tight text-white">
+          Chats
+        </h2>
         {me && (
           <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-black/20 px-3 py-2.5">
             <div className="relative">
-              <img src={me.image} alt={me.name} className="h-10 w-10 rounded-full object-cover" />
+              <img
+                src={me.image}
+                alt={me.name}
+                className="h-10 w-10 rounded-full object-cover"
+              />
               <span
                 className={`absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-[#111b21] ${
                   me.online ? "bg-green-500" : "bg-gray-400"
@@ -79,7 +85,9 @@ export function Sidebar({
               />
             </div>
             <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-[#e9edef]">{me.name}</p>
+              <p className="truncate text-sm font-semibold text-[#e9edef]">
+                {me.name}
+              </p>
               <p className="truncate text-xs text-[#8696a0]">{me.email}</p>
             </div>
           </div>
@@ -96,7 +104,8 @@ export function Sidebar({
         {(syncError || currentUserMissing) && (
           <div className="rounded-lg border border-white/10 bg-black/20 p-3 shadow-sm">
             <p className="text-xs text-[#d1d7db]">
-              {syncError || "Setting up your profile. If this takes long, retry."}
+              {syncError ||
+                "Setting up your profile. If this takes long, retry."}
             </p>
             <button
               onClick={onRetrySync}
@@ -117,7 +126,10 @@ export function Sidebar({
           {loadingData && (
             <div className="space-y-2 p-4">
               {Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="flex animate-pulse items-center gap-3 rounded-lg bg-[#1f2c34] p-3">
+                <div
+                  key={i}
+                  className="flex animate-pulse items-center gap-3 rounded-lg bg-[#1f2c34] p-3"
+                >
                   <div className="h-10 w-10 rounded-full bg-[#2b3942]" />
                   <div className="flex-1 space-y-2">
                     <div className="h-3 w-2/3 rounded bg-[#2b3942]" />
@@ -130,14 +142,20 @@ export function Sidebar({
           {!loadingData &&
             conversations.map((conversation) => {
               const otherUser = usersById.get(
-                String(conversation.participants.find((participant) => participant !== me?._id))
+                String(
+                  conversation.participants.find(
+                    (participant) => participant !== me?._id,
+                  ),
+                ),
               );
               return (
                 <button
                   key={conversation._id}
                   onClick={() => onOpenConversation(conversation._id)}
                   className={`flex w-full items-start gap-3 px-4 py-3 text-left transition-colors duration-150 hover:bg-[#253742] ${
-                    selectedConversationId === conversation._id ? "bg-[#2a3942]" : "bg-[#111b21]"
+                    selectedConversationId === conversation._id
+                      ? "bg-[#2a3942]"
+                      : "bg-[#111b21]"
                   }`}
                 >
                   <div className="relative">
@@ -203,7 +221,11 @@ export function Sidebar({
                 className="flex w-full items-center gap-3 bg-[#111b21] px-4 py-3 text-left transition-colors duration-150 hover:bg-[#253742]"
               >
                 <div className="relative">
-                  <img src={user.image} alt={user.name} className="h-10 w-10 rounded-full object-cover" />
+                  <img
+                    src={user.image}
+                    alt={user.name}
+                    className="h-10 w-10 rounded-full object-cover"
+                  />
                   <span
                     className={`absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-[#111b21] ${
                       user.online ? "bg-green-500" : "bg-gray-400"
@@ -211,7 +233,9 @@ export function Sidebar({
                   />
                 </div>
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-[#e9edef]">{user.name}</p>
+                  <p className="truncate text-sm font-medium text-[#e9edef]">
+                    {user.name}
+                  </p>
                   <p className="truncate text-xs text-gray-400">
                     {user.online ? "Online" : "Offline"}
                   </p>
@@ -220,7 +244,9 @@ export function Sidebar({
             ))}
           {!loadingData && filteredUsers.length === 0 && (
             <p className="px-4 py-4 text-sm text-[#8696a0]">
-              {hasSearch ? "No users match your search." : "No other registered users yet."}
+              {hasSearch
+                ? "No users match your search."
+                : "No other registered users yet."}
             </p>
           )}
         </section>
@@ -228,4 +254,3 @@ export function Sidebar({
     </aside>
   );
 }
-

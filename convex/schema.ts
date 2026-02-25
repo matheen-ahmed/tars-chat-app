@@ -12,6 +12,9 @@ export default defineSchema({
   }).index("by_clerkId", ["clerkId"]),
 
   conversations: defineTable({
+    conversationKey: v.string(),
+    participantA: v.id("users"),
+    participantB: v.id("users"),
     participants: v.array(v.id("users")),
     lastMessage: v.optional(v.string()),
     lastMessageTime: v.optional(v.number()),
@@ -28,7 +31,10 @@ export default defineSchema({
         updatedAt: v.number(),
       })
     ),
-  }),
+  })
+    .index("by_conversationKey", ["conversationKey"])
+    .index("by_participantA", ["participantA"])
+    .index("by_participantB", ["participantB"]),
 
   messages: defineTable({
     conversationId: v.id("conversations"),
