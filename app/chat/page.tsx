@@ -26,9 +26,11 @@ export default function ChatPage() {
   const [isSyncingProfile, setIsSyncingProfile] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [typingNow, setTypingNow] = useState(() => Date.now());
+  const [isNearBottomState, setIsNearBottomState] = useState(true);
 
   const listRef = useRef<HTMLDivElement | null>(null);
   const typingTimeoutRef = useRef<number | null>(null);
+  const prevMessageCountRef = useRef(0);
 
   const syncUser = useMutation(api.users.syncUser);
   const setOnline = useMutation(api.users.setOnlineStatus);
@@ -202,14 +204,20 @@ export default function ChatPage() {
 
   useEffect(() => {
     if (!listRef.current || messageCount === 0) return;
+    const isInitialLoad = prevMessageCountRef.current === 0;
+    const hasNewMessages = messageCount > prevMessageCountRef.current;
+    prevMessageCountRef.current = messageCount;
 
-    if (nearBottom(listRef.current)) {
+    if (isInitialLoad || (hasNewMessages && isNearBottomState)) {
       listRef.current.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
       setShowNewMessages(false);
-    } else {
+      return;
+    }
+
+    if (hasNewMessages && !isNearBottomState) {
       setShowNewMessages(true);
     }
-  }, [messageCount]);
+  }, [isNearBottomState, messageCount]);
 
   useEffect(() => {
     if (!conversationId || !me) return;
@@ -231,6 +239,8 @@ export default function ChatPage() {
     setShowMobileList(true);
     setMessageText("");
     setShowNewMessages(false);
+    setIsNearBottomState(true);
+    prevMessageCountRef.current = 0;
   }, [conversationId, directConversations]);
 
   const openConversation = (id: Id<"conversations">) => {
@@ -382,7 +392,9 @@ export default function ChatPage() {
             <div
               ref={listRef}
               onScroll={(event) => {
-                if (nearBottom(event.currentTarget)) {
+                const nearBottomNow = nearBottom(event.currentTarget);
+                setIsNearBottomState(nearBottomNow);
+                if (nearBottomNow) {
                   setShowNewMessages(false);
                 }
               }}
