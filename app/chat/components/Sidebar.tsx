@@ -52,7 +52,7 @@ export function Sidebar({
 }: SidebarProps) {
   return (
     <aside
-      className={`${mobileList ? "flex" : "hidden"} min-h-0 flex-col border-r border-[#1f2c34] bg-[#111b21] md:flex`}
+      className={`${mobileList ? "flex" : "hidden"} h-full min-h-0 flex-col border-r border-[#1f2c34] bg-[#111b21] md:flex`}
     >
       <div className="flex items-center justify-between border-b border-[#2b3942] bg-[#202c33] px-4 py-3 text-white">
         <div className="flex min-w-0 items-center gap-2">
