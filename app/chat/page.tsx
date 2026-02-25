@@ -412,7 +412,7 @@ export default function ChatPage() {
                 }}
                 className="mx-auto -mt-14 mb-2 rounded-full bg-[#25d366] px-4 py-2 text-sm font-medium text-white shadow-md"
               >
-                ? New messages
+                ↓ New messages
               </button>
             )}
 
@@ -422,6 +422,10 @@ export default function ChatPage() {
                 <input
                   value={messageText}
                   onChange={(event) => onType(event.target.value)}
+                  onBlur={() => {
+                    if (!conversationId || !me) return;
+                    void setTyping({ conversationId, userId: me._id, isTyping: false });
+                  }}
                   onKeyDown={(event) => {
                     if (event.key === "Enter" && !event.shiftKey) {
                       event.preventDefault();

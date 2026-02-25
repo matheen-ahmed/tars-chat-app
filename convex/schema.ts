@@ -12,9 +12,9 @@ export default defineSchema({
   }).index("by_clerkId", ["clerkId"]),
 
   conversations: defineTable({
-    conversationKey: v.string(),
-    participantA: v.id("users"),
-    participantB: v.id("users"),
+    conversationKey: v.optional(v.string()),
+    participantA: v.optional(v.id("users")),
+    participantB: v.optional(v.id("users")),
     participants: v.array(v.id("users")),
     lastMessage: v.optional(v.string()),
     lastMessageTime: v.optional(v.number()),
