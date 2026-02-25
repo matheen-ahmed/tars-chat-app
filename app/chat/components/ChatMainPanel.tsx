@@ -46,14 +46,11 @@ type ChatMainPanelProps = {
   onToggleStar: (messageId: Id<"messages">) => Promise<void>;
   onStartEdit: (messageId: Id<"messages">, content: string) => void;
   onToggleSelectMode: (messageId: Id<"messages">) => void;
-  onDeleteForMe: (messageId: Id<"messages">) => Promise<void>;
-  onDeleteForEveryone: (messageId: Id<"messages">) => Promise<void>;
   onOpenImagePreview: (url: string, name: string) => void;
   onNearBottom: () => void;
   showNew: boolean;
   onScrollToLatest: () => void;
   onCopySelectedMessages: () => Promise<void>;
-  onDeleteSelectedForMe: () => Promise<void>;
   onCancelSelectMode: () => void;
   actionErr: string | null;
   sendErr: boolean;
@@ -105,14 +102,11 @@ export function ChatMainPanel({
   onToggleStar,
   onStartEdit,
   onToggleSelectMode,
-  onDeleteForMe,
-  onDeleteForEveryone,
   onOpenImagePreview,
   onNearBottom,
   showNew,
   onScrollToLatest,
   onCopySelectedMessages,
-  onDeleteSelectedForMe,
   onCancelSelectMode,
   actionErr,
   sendErr,
@@ -178,8 +172,6 @@ export function ChatMainPanel({
             onToggleStar={onToggleStar}
             onStartEdit={onStartEdit}
             onToggleSelectMode={onToggleSelectMode}
-            onDeleteForMe={onDeleteForMe}
-            onDeleteForEveryone={onDeleteForEveryone}
             onOpenImagePreview={onOpenImagePreview}
             onNearBottom={onNearBottom}
           />
@@ -189,7 +181,7 @@ export function ChatMainPanel({
               onClick={onScrollToLatest}
               className="mx-auto -mt-14 mb-2 rounded-full bg-[#25d366] px-4 py-2 text-sm font-medium text-white shadow-md"
             >
-              New messages
+              ↓ New messages
             </button>
           )}
 
@@ -197,7 +189,6 @@ export function ChatMainPanel({
             selectMode={selectMode}
             selectedMessageIds={selectedMessageIds}
             onCopySelectedMessages={onCopySelectedMessages}
-            onDeleteSelectedForMe={onDeleteSelectedForMe}
             onCancelSelectMode={onCancelSelectMode}
             actionErr={actionErr}
             sendErr={sendErr}

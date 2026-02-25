@@ -10,7 +10,6 @@ import {
   Plus,
   Reply,
   Star,
-  Trash2,
   X,
 } from "lucide-react";
 import type { Id } from "../../../convex/_generated/dataModel";
@@ -36,8 +35,6 @@ type MessageMenuProps = {
   onToggleStar: (messageId: Id<"messages">) => Promise<void>;
   onStartEdit: (messageId: Id<"messages">, content: string) => void;
   onToggleSelectMode: (messageId: Id<"messages">) => void;
-  onDeleteForMe: (messageId: Id<"messages">) => Promise<void>;
-  onDeleteForEveryone: (messageId: Id<"messages">) => Promise<void>;
   onClose: () => void;
 };
 
@@ -61,8 +58,6 @@ export function MessageMenu({
   onToggleStar,
   onStartEdit,
   onToggleSelectMode,
-  onDeleteForMe,
-  onDeleteForEveryone,
   onClose,
 }: MessageMenuProps) {
   const menuContent = (
@@ -150,24 +145,6 @@ export function MessageMenu({
           <span>Select</span>
         </button>
 
-        <div className="my-1 border-t border-[#2a2f36]" />
-
-        <button
-          onClick={() => void onDeleteForMe(messageId)}
-          className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-[#252a30]"
-        >
-          <Trash2 className="h-4 w-4 text-[#a9b0b8]" />
-          <span>Delete for me</span>
-        </button>
-        {mine && (
-          <button
-            onClick={() => void onDeleteForEveryone(messageId)}
-            className="flex w-full items-center gap-3 border-t border-[#2a2f36] px-3 py-2 text-left text-red-300 hover:bg-[#2a2020]"
-          >
-            <Trash2 className="h-4 w-4" />
-            <span>Delete for everyone</span>
-          </button>
-        )}
       </div>
     </>
   );

@@ -23,6 +23,7 @@ type SidebarProps = {
   chatConversations: ConvDoc[];
   groupConversations: ConvDoc[];
   filteredUsers: UserDoc[];
+  allUsersCount: number;
   selectedConversationId: Id<"conversations"> | null;
   usersById: Map<string, UserDoc>;
   title: (conversation: ConvDoc) => string;
@@ -49,6 +50,7 @@ export function Sidebar({
   chatConversations,
   groupConversations,
   filteredUsers,
+  allUsersCount,
   selectedConversationId,
   usersById,
   title,
@@ -98,6 +100,22 @@ export function Sidebar({
         <h2 className="text-4xl font-semibold tracking-tight text-white">
           {activeTab === "groups" ? "Groups" : "Chats"}
         </h2>
+        {me && (
+          <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-black/20 px-3 py-2.5">
+            <div className="relative">
+              <img src={me.image} alt={me.name} className="h-10 w-10 rounded-full object-cover" />
+              <span
+                className={`absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-[#111b21] ${
+                  me.online ? "bg-green-500" : "bg-gray-400"
+                }`}
+              />
+            </div>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-[#e9edef]">{me.name}</p>
+              <p className="truncate text-xs text-[#8696a0]">{me.email}</p>
+            </div>
+          </div>
+        )}
         <div className="relative">
           <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-[#8596a0]" />
           <input
@@ -159,6 +177,8 @@ export function Sidebar({
         chatConversations={chatConversations}
         groupConversations={groupConversations}
         filteredUsers={filteredUsers}
+        search={search}
+        allUsersCount={allUsersCount}
         selectedConversationId={selectedConversationId}
         currentUserId={me?._id}
         usersById={usersById}

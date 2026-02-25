@@ -28,8 +28,6 @@ type MessageItemProps = {
   onToggleStar: (messageId: Id<"messages">) => Promise<void>;
   onStartEdit: (messageId: Id<"messages">, content: string) => void;
   onToggleSelectMode: (messageId: Id<"messages">) => void;
-  onDeleteForMe: (messageId: Id<"messages">) => Promise<void>;
-  onDeleteForEveryone: (messageId: Id<"messages">) => Promise<void>;
   onOpenImagePreview: (url: string, name: string) => void;
 };
 
@@ -54,8 +52,6 @@ export function MessageItem({
   onToggleStar,
   onStartEdit,
   onToggleSelectMode,
-  onDeleteForMe,
-  onDeleteForEveryone,
   onOpenImagePreview,
 }: MessageItemProps) {
   const reduceMotion = useReducedMotion();
@@ -213,8 +209,6 @@ export function MessageItem({
             onToggleStar={onToggleStar}
             onStartEdit={onStartEdit}
             onToggleSelectMode={onToggleSelectMode}
-            onDeleteForMe={onDeleteForMe}
-            onDeleteForEveryone={onDeleteForEveryone}
             onClose={() => onToggleMenu(null)}
           />
         )}

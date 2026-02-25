@@ -18,6 +18,8 @@ type ConversationListProps = {
   isGroupConversation: (conversation: ConvDoc) => boolean;
   onOpenConversation: (id: Id<"conversations">) => void;
   onOpenUserChat: (user: UserDoc) => void;
+  search: string;
+  allUsersCount: number;
 };
 
 export function ConversationList({
@@ -34,9 +36,12 @@ export function ConversationList({
   isGroupConversation,
   onOpenConversation,
   onOpenUserChat,
+  search,
+  allUsersCount,
 }: ConversationListProps) {
   const visibleConversations =
     activeTab === "groups" ? groupConversations : chatConversations;
+  const hasSearch = search.trim().length > 0;
 
   return (
     <div className="min-h-0 flex-1 overflow-y-auto">
@@ -138,7 +143,13 @@ export function ConversationList({
           })}
         {!loadingData && visibleConversations.length === 0 && (
           <p className="px-4 py-6 text-sm text-[#8696a0]">
-            {activeTab === "groups" ? "No groups found." : "No chats found."}
+            {hasSearch
+              ? activeTab === "groups"
+                ? "No groups match your search."
+                : "No chats match your search."
+              : activeTab === "groups"
+                ? "No groups yet. Create one to get started."
+                : "No conversations yet. Start by choosing a user below."}
           </p>
         )}
       </section>
@@ -175,6 +186,15 @@ export function ConversationList({
                 </div>
               </button>
             ))}
+          {!loadingData && filteredUsers.length === 0 && (
+            <p className="px-4 py-4 text-sm text-[#8696a0]">
+              {hasSearch
+                ? "No users match your search."
+                : allUsersCount === 0
+                  ? "No other registered users yet."
+                  : "No users available."}
+            </p>
+          )}
         </section>
       )}
     </div>

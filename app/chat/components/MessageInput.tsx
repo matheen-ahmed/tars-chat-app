@@ -9,7 +9,6 @@ type MessageInputProps = {
   selectMode: boolean;
   selectedMessageIds: Id<"messages">[];
   onCopySelectedMessages: () => Promise<void>;
-  onDeleteSelectedForMe: () => Promise<void>;
   onCancelSelectMode: () => void;
   actionErr: string | null;
   sendErr: boolean;
@@ -32,7 +31,6 @@ export function MessageInput({
   selectMode,
   selectedMessageIds,
   onCopySelectedMessages,
-  onDeleteSelectedForMe,
   onCancelSelectMode,
   actionErr,
   sendErr,
@@ -63,12 +61,9 @@ export function MessageInput({
               Copy
             </button>
             <button
-              onClick={() => void onDeleteSelectedForMe()}
-              className="font-semibold text-[#b42318]"
+              onClick={onCancelSelectMode}
+              className="font-semibold text-[#075e54]"
             >
-              Delete
-            </button>
-            <button onClick={onCancelSelectMode} className="font-semibold text-[#075e54]">
               Cancel
             </button>
           </div>

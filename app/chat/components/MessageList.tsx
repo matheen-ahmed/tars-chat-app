@@ -29,8 +29,6 @@ type MessageListProps = {
   onToggleStar: (messageId: Id<"messages">) => Promise<void>;
   onStartEdit: (messageId: Id<"messages">, content: string) => void;
   onToggleSelectMode: (messageId: Id<"messages">) => void;
-  onDeleteForMe: (messageId: Id<"messages">) => Promise<void>;
-  onDeleteForEveryone: (messageId: Id<"messages">) => Promise<void>;
   onOpenImagePreview: (url: string, name: string) => void;
   onNearBottom: () => void;
 };
@@ -58,8 +56,6 @@ export function MessageList({
   onToggleStar,
   onStartEdit,
   onToggleSelectMode,
-  onDeleteForMe,
-  onDeleteForEveryone,
   onOpenImagePreview,
   onNearBottom,
 }: MessageListProps) {
@@ -112,8 +108,6 @@ export function MessageList({
               onToggleStar={onToggleStar}
               onStartEdit={onStartEdit}
               onToggleSelectMode={onToggleSelectMode}
-              onDeleteForMe={onDeleteForMe}
-              onDeleteForEveryone={onDeleteForEveryone}
               onOpenImagePreview={onOpenImagePreview}
             />
           );

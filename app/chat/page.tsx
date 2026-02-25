@@ -84,8 +84,6 @@ export default function ChatPage() {
   const setTyping = useMutation(api.conversations.setTyping);
   const markAsRead = useMutation(api.conversations.markAsRead);
   const markMessagesAsSeen = useMutation(api.conversations.markMessagesAsSeen);
-  const deleteForMe = useMutation(api.conversations.deleteForMe);
-  const deleteForEveryone = useMutation(api.conversations.deleteForEveryone);
   const toggleReaction = useMutation(api.conversations.toggleReaction);
   const editMessage = useMutation(api.conversations.editMessage);
   const togglePin = useMutation(api.conversations.togglePin);
@@ -257,10 +255,7 @@ export default function ChatPage() {
     if (!selectedConv?.typing?.isTyping || !me || selectedConv.typing.userId === me._id) {
       return "";
     }
-    if (selectedConv.isGroup) {
-      return `${usersById.get(String(selectedConv.typing.userId))?.name || "Someone"} is typing...`;
-    }
-    return "Typing...";
+    return `${usersById.get(String(selectedConv.typing.userId))?.name || "Someone"} is typing...`;
   })();
   const canManageSelectedGroup =
     !!selectedConv &&
@@ -390,28 +385,6 @@ export default function ChatPage() {
       setSendRetry({ cid: targetCid, text: content });
     } finally {
       setSending(false);
-    }
-  };
-
-  const delForEveryone = async (mid: Id<"messages">) => {
-    if (!me) return;
-    setActionErr(null);
-    try {
-      await deleteForEveryone({ messageId: mid, userId: me._id });
-      setMenuMsgId(null);
-    } catch {
-      setActionErr("Could not delete message.");
-    }
-  };
-
-  const delForMe = async (mid: Id<"messages">) => {
-    if (!me) return;
-    setActionErr(null);
-    try {
-      await deleteForMe({ messageId: mid, userId: me._id });
-      setMenuMsgId(null);
-    } catch {
-      setActionErr("Could not delete for you.");
     }
   };
 
@@ -647,14 +620,6 @@ export default function ChatPage() {
     setSelectedMessageIds([]);
   };
 
-  const deleteSelectedForMe = async () => {
-    if (!me || selectedMessageIds.length === 0) return;
-    for (const mid of selectedMessageIds) {
-      await deleteForMe({ messageId: mid, userId: me._id });
-    }
-    cancelSelectMode();
-  };
-
   const copySelectedMessages = async () => {
     if (selectedMessageIds.length === 0) return;
     const selected = (messages || [])
@@ -801,6 +766,7 @@ export default function ChatPage() {
         chatConversations={filteredChatConversations}
         groupConversations={filteredGroupConversations}
         filteredUsers={filteredUsers}
+        allUsersCount={users?.length ?? 0}
         selectedConversationId={cid}
         usersById={usersById}
         title={title}
@@ -844,8 +810,6 @@ export default function ChatPage() {
         onToggleStar={onToggleStar}
         onStartEdit={startEdit}
         onToggleSelectMode={toggleSelectMode}
-        onDeleteForMe={delForMe}
-        onDeleteForEveryone={delForEveryone}
         onOpenImagePreview={(url, name) => {
           setImagePreviewUrl(url);
           setImagePreviewName(name);
@@ -861,7 +825,6 @@ export default function ChatPage() {
           setShowNew(false);
         }}
         onCopySelectedMessages={copySelectedMessages}
-        onDeleteSelectedForMe={deleteSelectedForMe}
         onCancelSelectMode={cancelSelectMode}
         actionErr={actionErr}
         sendErr={sendErr}
