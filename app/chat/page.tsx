@@ -789,7 +789,7 @@ export default function ChatPage() {
   const loadingMessages = !!cid && messages === undefined;
 
   return (
-    <div className="flex h-[100dvh] w-full flex-col overflow-hidden bg-[#0b141a] text-gray-100 md:grid md:grid-cols-[420px_1fr]">
+    <div className="flex h-[100dvh] w-full flex-col overflow-hidden bg-[linear-gradient(165deg,#16222d_0%,#0f1a23_45%,#090f15_100%)] text-gray-100 md:grid md:grid-cols-[420px_1fr]">
       <Sidebar
         activeTab={sidebarTab}
         onTabChange={setSidebarTab}
@@ -816,7 +816,9 @@ export default function ChatPage() {
         onOpenContactDrawer={openContactDrawer}
       />
 
-      <main className={`${!mobileList ? "flex" : "hidden"} h-full min-h-0 flex-col md:flex`}>
+      <main
+        className={`${!mobileList ? "flex" : "hidden"} h-full min-h-0 flex-col bg-[radial-gradient(120%_90%_at_50%_0%,rgba(67,94,117,0.18),rgba(7,12,18,0)_60%),linear-gradient(180deg,rgba(17,28,37,0.72)_0%,rgba(8,14,20,0.92)_100%)] px-2 pb-2 md:flex md:px-0 md:pb-0`}
+      >
         {!selectedConv || !me ? (
           <div className="flex h-full items-center justify-center px-8 text-center text-[#8696a0]">
             <p>Select a conversation or user to start chatting.</p>

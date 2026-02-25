@@ -60,9 +60,9 @@ export function Sidebar({
 }: SidebarProps) {
   return (
     <aside
-      className={`${mobileList ? "flex" : "hidden"} h-full min-h-0 flex-col border-r border-[#1f2c34] bg-[#111b21] md:flex`}
+      className={`${mobileList ? "flex" : "hidden"} h-full min-h-0 flex-col border-r border-white/10 bg-[#101820]/70 backdrop-blur-xl md:flex`}
     >
-      <div className="flex items-center justify-between border-b border-[#2b3942] bg-[#202c33] px-4 py-3 text-white">
+      <div className="flex items-center justify-between border-b border-white/10 bg-white/5 px-4 py-3.5 text-white shadow-[0_6px_20px_rgba(0,0,0,0.2)]">
         <div className="flex min-w-0 items-center gap-2">
           <Image
             src="/quickchat-mark.svg"
@@ -94,7 +94,7 @@ export function Sidebar({
         </div>
       </div>
 
-      <div className="space-y-3 border-b border-[#1f2c34] bg-[#111b21] px-4 py-4">
+      <div className="space-y-3 border-b border-white/10 bg-white/[0.03] px-4 py-4.5">
         <h2 className="text-4xl font-semibold tracking-tight text-white">
           {activeTab === "groups" ? "Groups" : "Chats"}
         </h2>
@@ -104,7 +104,7 @@ export function Sidebar({
             value={search}
             onChange={(event) => onSearchChange(event.target.value)}
             placeholder="Search or start a new chat"
-            className="w-full rounded-full border border-[#2b3942] bg-[#202c33] px-9 py-2 text-sm text-[#d1d7db] outline-none focus:border-[#3b82f6]"
+            className="w-full rounded-full border border-white/15 bg-black/20 px-9 py-2.5 text-sm text-[#d1d7db] outline-none transition-colors duration-200 focus:border-[#3b82f6]"
           />
         </div>
         <div className="flex items-center gap-2 pt-1">
@@ -113,7 +113,7 @@ export function Sidebar({
             className={`rounded-full px-4 py-1.5 text-sm font-semibold transition ${
               activeTab === "chats"
                 ? "bg-[#16a34a] text-white"
-                : "bg-[#202c33] text-[#aebac1] hover:bg-[#2a3942]"
+                : "bg-black/20 text-[#aebac1] hover:bg-white/10"
             }`}
           >
             Chats
@@ -123,7 +123,7 @@ export function Sidebar({
             className={`rounded-full px-4 py-1.5 text-sm font-semibold transition ${
               activeTab === "groups"
                 ? "bg-[#2563eb] text-white"
-                : "bg-[#202c33] text-[#aebac1] hover:bg-[#2a3942]"
+                : "bg-black/20 text-[#aebac1] hover:bg-white/10"
             }`}
           >
             Groups
@@ -138,7 +138,7 @@ export function Sidebar({
           )}
         </div>
         {(syncError || currentUserMissing) && (
-          <div className="rounded-lg border border-[#3b4a54] bg-[#1f2c34] p-3">
+          <div className="rounded-lg border border-white/10 bg-black/20 p-3 shadow-sm">
             <p className="text-xs text-[#d1d7db]">
               {syncError || "Setting up your profile. If this takes long, retry."}
             </p>

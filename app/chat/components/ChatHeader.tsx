@@ -1,5 +1,6 @@
 "use client";
 
+import { ArrowLeft } from "lucide-react";
 import type { ConvDoc, ContactDrawerData, UserDoc } from "../lib/types";
 
 type ChatHeaderProps = {
@@ -40,12 +41,16 @@ export function ChatHeader({
   const typingLabel = typingText.replace(/\.\.\.$/, "");
 
   return (
-    <header className="flex items-center border-b border-[#1f2c34] bg-[#202c33] px-4 py-2 text-white">
-      <button onClick={onBack} className="mr-2 rounded-md px-2 py-1 text-sm md:hidden">
-        Back
+    <header className="flex items-center border-b border-white/10 bg-[#1a252d]/70 px-4 py-2.5 text-white backdrop-blur-xl shadow-[0_8px_24px_rgba(0,0,0,0.28)] md:px-5">
+      <button
+        onClick={onBack}
+        aria-label="Back"
+        className="mr-3 rounded-full p-2 text-[#d1d7db] transition-colors duration-200 hover:bg-white/10 hover:text-white md:hidden"
+      >
+        <ArrowLeft className="h-5 w-5" />
       </button>
       {selectedIsGroup ? (
-        <div className="mr-3 flex h-10 w-10 items-center justify-center rounded-full bg-[#128c7e] text-sm font-semibold">
+        <div className="mr-3 flex h-10 w-10 items-center justify-center rounded-full bg-[#128c7e] text-sm font-semibold shadow-md">
           {(selectedConversation.groupName || "G").slice(0, 2).toUpperCase()}
         </div>
       ) : (
@@ -59,7 +64,7 @@ export function ChatHeader({
               canEdit: false,
             });
           }}
-          className="mr-3 rounded-full"
+          className="mr-3 rounded-full ring-1 ring-white/10 transition duration-200 hover:ring-white/20"
         >
           <img
             src={otherUser?.image || ""}
@@ -96,13 +101,13 @@ export function ChatHeader({
         <div className="ml-3 flex items-center gap-2">
           <button
             onClick={() => void onRenameGroup()}
-            className="rounded-md border border-[#2b3942] px-2 py-1 text-xs text-[#d1d7db] hover:bg-[#2a3942]"
+            className="rounded-md border border-white/15 bg-white/5 px-2.5 py-1 text-xs text-[#d1d7db] transition-colors duration-200 hover:bg-white/10"
           >
             Rename
           </button>
           <button
             onClick={() => void onDeleteGroup()}
-            className="rounded-md border border-red-700/60 px-2 py-1 text-xs text-red-300 hover:bg-red-900/20"
+            className="rounded-md border border-red-700/60 bg-red-900/10 px-2.5 py-1 text-xs text-red-300 transition-colors duration-200 hover:bg-red-900/25"
           >
             Delete
           </button>
