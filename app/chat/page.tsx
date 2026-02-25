@@ -13,21 +13,21 @@ import { formatTimestamp, nearBottom } from "./lib/utils";
 const PRESENCE_PING_MS = 15_000;
 const TYPING_IDLE_MS = 2_000;
 
-const isDirectConversation = (conversation: ConvDoc) =>
-  !conversation.isGroup && conversation.participants.length === 2;
-
 export default function ChatPage() {
   const { user, isLoaded } = useUser();
 
   const [search, setSearch] = useState("");
   const [conversationId, setConversationId] = useState<Id<"conversations"> | null>(null);
-  const [mobileList, setMobileList] = useState(true);
-  const [text, setText] = useState("");
-  const [sending, setSending] = useState(false);
+  const [showMobileList, setShowMobileList] = useState(true);
+  const [messageText, setMessageText] = useState("");
+  const [isSending, setIsSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const [showNewMessages, setShowNewMessages] = useState(false);
-  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [isSyncingProfile, setIsSyncingProfile] = useState(false);
+  const [syncError, setSyncError] = useState<string | null>(null);
+
   const listRef = useRef<HTMLDivElement | null>(null);
+  const typingTimeoutRef = useRef<number | null>(null);
 
   const syncUser = useMutation(api.users.syncUser);
   const setOnline = useMutation(api.users.setOnlineStatus);
@@ -36,7 +36,6 @@ export default function ChatPage() {
   const sendMessage = useMutation(api.conversations.sendMessage);
   const setTyping = useMutation(api.conversations.setTyping);
   const markAsRead = useMutation(api.conversations.markAsRead);
-  const markMessagesAsSeen = useMutation(api.conversations.markMessagesAsSeen);
 
   const users = useQuery(api.users.getUsers, user ? { clerkId: user.id } : "skip") as
     | UserDoc[]
@@ -56,12 +55,21 @@ export default function ChatPage() {
 
   const syncCurrentUser = useCallback(async () => {
     if (!user) return;
-    await syncUser({
-      clerkId: user.id,
-      name: user.fullName || "User",
-      email: user.primaryEmailAddress?.emailAddress || "",
-      image: user.imageUrl,
-    });
+
+    setIsSyncingProfile(true);
+    setSyncError(null);
+    try {
+      await syncUser({
+        clerkId: user.id,
+        name: user.fullName || "User",
+        email: user.primaryEmailAddress?.emailAddress || "",
+        image: user.imageUrl,
+      });
+    } catch {
+      setSyncError("Unable to sync your profile right now. Please retry.");
+    } finally {
+      setIsSyncingProfile(false);
+    }
   }, [syncUser, user]);
 
   useEffect(() => {
@@ -81,20 +89,23 @@ export default function ChatPage() {
       void setOnline({ clerkId: user.id, online: true });
       void heartbeat({ clerkId: user.id });
     };
-    const onOffline = () => void setOnline({ clerkId: user.id, online: false });
+
+    const onOffline = () => {
+      void setOnline({ clerkId: user.id, online: false });
+    };
 
     onOnline();
-    const ping = setInterval(() => void heartbeat({ clerkId: user.id }), PRESENCE_PING_MS);
-    const visibilityHandler = () =>
+    const ping = window.setInterval(() => void heartbeat({ clerkId: user.id }), PRESENCE_PING_MS);
+    const onVisibilityChange = () =>
       document.visibilityState === "visible" ? onOnline() : onOffline();
 
-    document.addEventListener("visibilitychange", visibilityHandler);
+    document.addEventListener("visibilitychange", onVisibilityChange);
     window.addEventListener("pagehide", onOffline);
     window.addEventListener("beforeunload", onOffline);
 
     return () => {
-      clearInterval(ping);
-      document.removeEventListener("visibilitychange", visibilityHandler);
+      window.clearInterval(ping);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
       window.removeEventListener("pagehide", onOffline);
       window.removeEventListener("beforeunload", onOffline);
       onOffline();
@@ -103,28 +114,30 @@ export default function ChatPage() {
 
   const usersById = useMemo(() => {
     const map = new Map<string, UserDoc>();
-    (users || []).forEach((u) => map.set(String(u._id), u));
+    (users || []).forEach((item) => map.set(String(item._id), item));
     return map;
   }, [users]);
 
   const directConversations = useMemo(
-    () => (conversations || []).filter((conversation) => isDirectConversation(conversation)),
+    () =>
+      (conversations || []).filter(
+        (conversation) => conversation.participants.length === 2
+      ),
     [conversations]
   );
 
   const conversationTitle = useCallback(
-    (conversation: ConvDoc) =>
-      usersById.get(
-        String(conversation.participants.find((participant) => participant !== me?._id))
-      )?.name || "Conversation",
+    (conversation: ConvDoc) => {
+      const otherId = conversation.participants.find((participant) => participant !== me?._id);
+      return usersById.get(String(otherId))?.name || "Conversation";
+    },
     [me?._id, usersById]
   );
 
   const conversationSubtitle = useCallback(
     (conversation: ConvDoc) => {
-      const other = usersById.get(
-        String(conversation.participants.find((participant) => participant !== me?._id))
-      );
+      const otherId = conversation.participants.find((participant) => participant !== me?._id);
+      const other = usersById.get(String(otherId));
       return other?.online ? "Online" : "Offline";
     },
     [me?._id, usersById]
@@ -133,6 +146,7 @@ export default function ChatPage() {
   const filteredConversations = useMemo(() => {
     const query = search.trim().toLowerCase();
     if (!query) return directConversations;
+
     return directConversations.filter((conversation) =>
       conversationTitle(conversation).toLowerCase().includes(query)
     );
@@ -141,7 +155,8 @@ export default function ChatPage() {
   const filteredUsers = useMemo(() => {
     const query = search.trim().toLowerCase();
     if (!users) return [];
-    return query ? users.filter((u) => u.name.toLowerCase().includes(query)) : users;
+    if (!query) return users;
+    return users.filter((profile) => profile.name.toLowerCase().includes(query));
   }, [search, users]);
 
   const selectedConversation = useMemo(
@@ -151,17 +166,16 @@ export default function ChatPage() {
 
   const otherUser = useMemo(() => {
     if (!selectedConversation || !me) return null;
-    return (
-      usersById.get(
-        String(selectedConversation.participants.find((participant) => participant !== me._id))
-      ) || null
-    );
+    const otherId = selectedConversation.participants.find((participant) => participant !== me._id);
+    return usersById.get(String(otherId)) || null;
   }, [me, selectedConversation, usersById]);
 
   const typingText = useMemo(() => {
     if (!selectedConversation?.typing?.isTyping || !me) return "";
     if (selectedConversation.typing.userId === me._id) return "";
-    return `${usersById.get(String(selectedConversation.typing.userId))?.name || "Someone"} is typing...`;
+
+    const typer = usersById.get(String(selectedConversation.typing.userId));
+    return `${typer?.name || "Someone"} is typing...`;
   }, [me, selectedConversation, usersById]);
 
   const messageCount = messages?.length ?? 0;
@@ -169,11 +183,11 @@ export default function ChatPage() {
   useEffect(() => {
     if (!conversationId || !me) return;
     void markAsRead({ conversationId, userId: me._id });
-    void markMessagesAsSeen({ conversationId, userId: me._id });
-  }, [conversationId, markAsRead, markMessagesAsSeen, me, messageCount]);
+  }, [conversationId, markAsRead, me, messageCount]);
 
   useEffect(() => {
     if (!listRef.current || messageCount === 0) return;
+
     if (nearBottom(listRef.current)) {
       listRef.current.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
       setShowNewMessages(false);
@@ -184,27 +198,33 @@ export default function ChatPage() {
 
   useEffect(() => {
     if (!conversationId || !me) return;
+
     return () => {
-      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      if (typingTimeoutRef.current) {
+        window.clearTimeout(typingTimeoutRef.current);
+      }
       void setTyping({ conversationId, userId: me._id, isTyping: false });
     };
   }, [conversationId, me, setTyping]);
 
   useEffect(() => {
     if (!conversationId) return;
-    if (!directConversations.some((conversation) => conversation._id === conversationId)) {
-      setConversationId(null);
-      setMobileList(true);
-      setText("");
-      setShowNewMessages(false);
-    }
+    const stillExists = directConversations.some((conversation) => conversation._id === conversationId);
+    if (stillExists) return;
+
+    setConversationId(null);
+    setShowMobileList(true);
+    setMessageText("");
+    setShowNewMessages(false);
   }, [conversationId, directConversations]);
 
   const openConversation = (id: Id<"conversations">) => {
     setConversationId(id);
-    setMobileList(false);
+    setShowMobileList(false);
     setSendError(null);
-    if (me) void markAsRead({ conversationId: id, userId: me._id });
+    if (me) {
+      void markAsRead({ conversationId: id, userId: me._id });
+    }
   };
 
   const openUserChat = async (targetUser: UserDoc) => {
@@ -214,42 +234,47 @@ export default function ChatPage() {
   };
 
   const onType = (value: string) => {
-    setText(value);
+    setMessageText(value);
+
     if (!conversationId || !me) return;
 
     void setTyping({ conversationId, userId: me._id, isTyping: true });
-    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-    typingTimeoutRef.current = setTimeout(
-      () => void setTyping({ conversationId, userId: me._id, isTyping: false }),
-      TYPING_IDLE_MS
-    );
+    if (typingTimeoutRef.current) {
+      window.clearTimeout(typingTimeoutRef.current);
+    }
+    typingTimeoutRef.current = window.setTimeout(() => {
+      void setTyping({ conversationId, userId: me._id, isTyping: false });
+    }, TYPING_IDLE_MS);
   };
 
   const onSend = async () => {
-    if (!conversationId || !me || !text.trim() || sending) return;
-    setSending(true);
+    if (!conversationId || !me || !messageText.trim() || isSending) return;
+
+    setIsSending(true);
     setSendError(null);
 
     try {
-      const ok = await sendMessage({
+      const created = await sendMessage({
         conversationId,
         senderId: me._id,
-        content: text.trim(),
+        content: messageText,
       });
-      if (!ok) {
-        setSendError("Failed to send message.");
+
+      if (!created) {
+        setSendError("Failed to send message. Try again.");
         return;
       }
+
       await setTyping({ conversationId, userId: me._id, isTyping: false });
-      setText("");
+      setMessageText("");
       if (listRef.current) {
         listRef.current.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
       }
       setShowNewMessages(false);
     } catch {
-      setSendError("Failed to send message.");
+      setSendError("Failed to send message. Try again.");
     } finally {
-      setSending(false);
+      setIsSending(false);
     }
   };
 
@@ -261,21 +286,21 @@ export default function ChatPage() {
     );
   }
 
-  const loadingData = users === undefined || me === undefined || (!!me && conversations === undefined);
-  const loadingMessages = !!conversationId && messages === undefined;
+  const isLoadingData = users === undefined || me === undefined || (!!me && conversations === undefined);
+  const isLoadingMessages = !!conversationId && messages === undefined;
 
   return (
     <div className="flex h-[100dvh] w-full flex-col overflow-hidden bg-[linear-gradient(165deg,#16222d_0%,#0f1a23_45%,#090f15_100%)] text-gray-100 md:grid md:grid-cols-[420px_1fr]">
       <Sidebar
-        mobileList={mobileList}
+        mobileList={showMobileList}
         me={me ?? null}
-        syncingProfile={false}
-        syncError={null}
+        syncingProfile={isSyncingProfile}
+        syncError={syncError}
         currentUserMissing={me === null}
         onRetrySync={() => void syncCurrentUser()}
         search={search}
         onSearchChange={setSearch}
-        loadingData={loadingData}
+        loadingData={isLoadingData}
         conversations={filteredConversations}
         filteredUsers={filteredUsers}
         selectedConversationId={conversationId}
@@ -283,11 +308,11 @@ export default function ChatPage() {
         conversationTitle={conversationTitle}
         conversationSubtitle={conversationSubtitle}
         onOpenConversation={openConversation}
-        onOpenUserChat={(u) => void openUserChat(u)}
+        onOpenUserChat={(profile) => void openUserChat(profile)}
       />
 
       <main
-        className={`${!mobileList ? "flex" : "hidden"} h-full min-h-0 flex-col bg-[radial-gradient(120%_90%_at_50%_0%,rgba(67,94,117,0.18),rgba(7,12,18,0)_60%),linear-gradient(180deg,rgba(17,28,37,0.72)_0%,rgba(8,14,20,0.92)_100%)] md:flex`}
+        className={`${!showMobileList ? "flex" : "hidden"} h-full min-h-0 flex-col bg-[radial-gradient(120%_90%_at_50%_0%,rgba(67,94,117,0.18),rgba(7,12,18,0)_60%),linear-gradient(180deg,rgba(17,28,37,0.72)_0%,rgba(8,14,20,0.92)_100%)] md:flex`}
       >
         {!selectedConversation || !me ? (
           <div className="flex h-full items-center justify-center px-8 text-center text-[#8696a0]">
@@ -297,12 +322,13 @@ export default function ChatPage() {
           <>
             <header className="flex items-center border-b border-white/10 bg-[#1a252d]/70 px-4 py-2.5 text-white backdrop-blur-xl md:px-5">
               <button
-                onClick={() => setMobileList(true)}
+                onClick={() => setShowMobileList(true)}
                 className="mr-3 rounded-full p-2 text-[#d1d7db] hover:bg-white/10 md:hidden"
                 aria-label="Back"
               >
                 <ArrowLeft className="h-5 w-5" />
               </button>
+
               <img
                 src={otherUser?.image || ""}
                 alt={otherUser?.name || "User"}
@@ -331,14 +357,18 @@ export default function ChatPage() {
 
             <div
               ref={listRef}
-              onScroll={(event) => nearBottom(event.currentTarget) && setShowNewMessages(false)}
+              onScroll={(event) => {
+                if (nearBottom(event.currentTarget)) {
+                  setShowNewMessages(false);
+                }
+              }}
               className="relative min-h-0 flex-1 overflow-y-auto bg-[#0b141a] bg-[radial-gradient(circle_at_1px_1px,_rgba(255,255,255,0.04)_1px,_transparent_0)] [background-size:20px_20px] px-4 py-4"
             >
               <div className="mx-auto flex max-w-3xl flex-col gap-2">
-                {loadingMessages && (
+                {isLoadingMessages && (
                   <div className="space-y-2">
-                    {Array.from({ length: 8 }).map((_, i) => (
-                      <div key={i} className={`flex ${i % 2 === 0 ? "justify-start" : "justify-end"}`}>
+                    {Array.from({ length: 8 }).map((_, index) => (
+                      <div key={index} className={`flex ${index % 2 === 0 ? "justify-start" : "justify-end"}`}>
                         <div className="h-14 w-48 animate-pulse rounded-xl bg-white/70" />
                       </div>
                     ))}
@@ -352,15 +382,12 @@ export default function ChatPage() {
                 )}
 
                 {messages?.map((message) => {
-                  const mine = message.senderId === me._id;
+                  const isMine = message.senderId === me._id;
                   return (
-                    <div
-                      key={message._id}
-                      className={`flex ${mine ? "justify-end" : "justify-start"}`}
-                    >
+                    <div key={message._id} className={`flex ${isMine ? "justify-end" : "justify-start"}`}>
                       <div
                         className={`max-w-[82%] rounded-2xl border px-3.5 py-2.5 text-sm shadow-[0_10px_28px_rgba(0,0,0,0.28)] md:max-w-[62%] ${
-                          mine
+                          isMine
                             ? "border-[#1f6f62]/80 bg-[linear-gradient(145deg,rgba(0,112,92,0.92),rgba(0,88,75,0.94))]"
                             : "border-[#2a3942]/80 bg-[linear-gradient(145deg,rgba(34,47,57,0.9),rgba(26,37,46,0.92))]"
                         }`}
@@ -385,7 +412,7 @@ export default function ChatPage() {
                 }}
                 className="mx-auto -mt-14 mb-2 rounded-full bg-[#25d366] px-4 py-2 text-sm font-medium text-white shadow-md"
               >
-                ↓ New messages
+                ? New messages
               </button>
             )}
 
@@ -393,7 +420,7 @@ export default function ChatPage() {
               {sendError && <p className="mb-2 text-center text-xs text-red-400">{sendError}</p>}
               <div className="mx-auto flex w-full max-w-3xl min-w-0 items-center gap-2">
                 <input
-                  value={text}
+                  value={messageText}
                   onChange={(event) => onType(event.target.value)}
                   onKeyDown={(event) => {
                     if (event.key === "Enter" && !event.shiftKey) {
@@ -406,10 +433,10 @@ export default function ChatPage() {
                 />
                 <button
                   onClick={() => void onSend()}
-                  disabled={sending || !text.trim()}
+                  disabled={isSending || !messageText.trim()}
                   className="shrink-0 rounded-full bg-[#128c7e] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-green-600 disabled:cursor-not-allowed disabled:bg-[#2f655d]"
                 >
-                  {sending ? "Sending..." : "Send"}
+                  {isSending ? "Sending..." : "Send"}
                 </button>
               </div>
             </footer>

@@ -1,5 +1,3 @@
-export const REACTIONS = ["\u{1F44D}", "\u2764\uFE0F", "\u{1F602}", "\u{1F62E}", "\u{1F622}"] as const;
-
 export const formatTimestamp = (value: number) => {
   const date = new Date(value);
   const now = new Date();
