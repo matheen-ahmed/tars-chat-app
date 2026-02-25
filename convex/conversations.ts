@@ -1,8 +1,15 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
-import type { Id } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
 
 const TYPING_TIMEOUT_MS = 2_000;
+
+type LastSeenEntry = {
+  userId: Id<"users">;
+  timestamp: number;
+};
+
+type ConversationDoc = Doc<"conversations">;
 
 const normalizeParticipants = (user1: Id<"users">, user2: Id<"users">) => {
   const [participantA, participantB] =
@@ -22,6 +29,59 @@ const safeTwoParticipants = (value: unknown): [Id<"users">, Id<"users">] | null 
   return [first as Id<"users">, second as Id<"users">];
 };
 
+const defaultLastSeen = (user1: Id<"users">, user2: Id<"users">, firstTimestamp: number): LastSeenEntry[] => [
+  { userId: user1, timestamp: firstTimestamp },
+  { userId: user2, timestamp: 0 },
+];
+
+const upsertLastSeen = (
+  current: LastSeenEntry[] | undefined,
+  userId: Id<"users">,
+  timestamp: number
+): LastSeenEntry[] => {
+  const existing = current ?? [];
+  const hasEntry = existing.some((entry) => entry.userId === userId);
+
+  if (!hasEntry) {
+    return [...existing, { userId, timestamp }];
+  }
+
+  return existing.map((entry) =>
+    entry.userId === userId ? { ...entry, timestamp } : entry
+  );
+};
+
+const mergeConversationsById = (
+  asParticipantA: ConversationDoc[],
+  asParticipantB: ConversationDoc[]
+) => {
+  const map = new Map(asParticipantA.map((conversation) => [String(conversation._id), conversation]));
+  for (const conversation of asParticipantB) {
+    map.set(String(conversation._id), conversation);
+  }
+  return Array.from(map.values());
+};
+
+const toNormalizedLegacyConversation = (conversation: ConversationDoc): ConversationDoc => {
+  const pair = safeTwoParticipants(conversation.participants);
+  if (!pair) return conversation;
+
+  const { participantA, participantB } = normalizeParticipants(pair[0], pair[1]);
+  return {
+    ...conversation,
+    conversationKey: conversation.conversationKey ?? buildConversationKey(participantA, participantB),
+    participantA: conversation.participantA ?? participantA,
+    participantB: conversation.participantB ?? participantB,
+    participants: [participantA, participantB],
+    lastSeen:
+      conversation.lastSeen ??
+      [
+        { userId: participantA, timestamp: 0 },
+        { userId: participantB, timestamp: 0 },
+      ],
+  };
+};
+
 export const getOrCreateConversation = mutation({
   args: {
     user1: v.id("users"),
@@ -30,6 +90,7 @@ export const getOrCreateConversation = mutation({
   handler: async (ctx, args) => {
     const { participantA, participantB } = normalizeParticipants(args.user1, args.user2);
     const conversationKey = buildConversationKey(args.user1, args.user2);
+
     const existing = await ctx.db
       .query("conversations")
       .withIndex("by_conversationKey", (q) => q.eq("conversationKey", conversationKey))
@@ -41,43 +102,37 @@ export const getOrCreateConversation = mutation({
         participantA: Id<"users">;
         participantB: Id<"users">;
         participants: Id<"users">[];
-        lastSeen: { userId: Id<"users">; timestamp: number }[];
+        lastSeen: LastSeenEntry[];
       }> = {};
+
       if (!existing.conversationKey) updates.conversationKey = conversationKey;
       if (!existing.participantA) updates.participantA = participantA;
       if (!existing.participantB) updates.participantB = participantB;
       if (existing.participants.length !== 2) updates.participants = [participantA, participantB];
-      if (!existing.lastSeen) {
-        updates.lastSeen = [
-          { userId: args.user1, timestamp: Date.now() },
-          { userId: args.user2, timestamp: 0 },
-        ];
-      }
+      if (!existing.lastSeen) updates.lastSeen = defaultLastSeen(args.user1, args.user2, Date.now());
+
       if (Object.keys(updates).length > 0) {
         await ctx.db.patch(existing._id, updates);
       }
+
       return existing._id;
     }
 
     // Backward-compatibility fallback for legacy rows that predate conversationKey.
     const legacyConversations = await ctx.db.query("conversations").collect();
-    const legacyExisting = legacyConversations.find(
-      (conversation) => {
-        const pair = safeTwoParticipants(conversation.participants);
-        if (!pair) return false;
-        return pair.includes(args.user1) && pair.includes(args.user2);
-      }
-    );
+    const legacyExisting = legacyConversations.find((conversation) => {
+      const pair = safeTwoParticipants(conversation.participants);
+      if (!pair) return false;
+      return pair.includes(args.user1) && pair.includes(args.user2);
+    });
+
     if (legacyExisting) {
       await ctx.db.patch(legacyExisting._id, {
         conversationKey,
         participantA,
         participantB,
         participants: [participantA, participantB],
-        lastSeen: legacyExisting.lastSeen ?? [
-          { userId: args.user1, timestamp: Date.now() },
-          { userId: args.user2, timestamp: 0 },
-        ],
+        lastSeen: legacyExisting.lastSeen ?? defaultLastSeen(args.user1, args.user2, Date.now()),
       });
       return legacyExisting._id;
     }
@@ -90,10 +145,7 @@ export const getOrCreateConversation = mutation({
       participants: [participantA, participantB],
       lastMessage: "",
       lastMessageTime: now,
-      lastSeen: [
-        { userId: args.user1, timestamp: now },
-        { userId: args.user2, timestamp: 0 },
-      ],
+      lastSeen: defaultLastSeen(args.user1, args.user2, now),
       typing: {
         userId: args.user1,
         isTyping: false,
@@ -141,18 +193,10 @@ export const sendMessage = mutation({
       seenBy: [args.senderId],
     });
 
-    const lastSeen = conversation.lastSeen ?? [];
-    const hasSenderLastSeen = lastSeen.some((entry) => entry.userId === args.senderId);
-    const nextLastSeen = hasSenderLastSeen
-      ? lastSeen.map((entry) =>
-          entry.userId === args.senderId ? { ...entry, timestamp: now } : entry
-        )
-      : [...lastSeen, { userId: args.senderId, timestamp: now }];
-
     await ctx.db.patch(conversation._id, {
       lastMessage: trimmedContent,
       lastMessageTime: now,
-      lastSeen: nextLastSeen,
+      lastSeen: upsertLastSeen(conversation.lastSeen as LastSeenEntry[] | undefined, args.senderId, now),
       typing: {
         userId: args.senderId,
         isTyping: false,
@@ -180,13 +224,7 @@ export const getConversations = query({
         .collect(),
     ]);
 
-    const conversationMap = new Map(
-      asParticipantA.map((conversation) => [String(conversation._id), conversation])
-    );
-    for (const conversation of asParticipantB) {
-      conversationMap.set(String(conversation._id), conversation);
-    }
-    let myConversations = Array.from(conversationMap.values());
+    let myConversations = mergeConversationsById(asParticipantA, asParticipantB);
 
     // Backward-compatibility fallback for legacy rows without indexed participant fields.
     if (myConversations.length === 0) {
@@ -197,24 +235,7 @@ export const getConversations = query({
         return pair.includes(args.userId);
       });
 
-      myConversations = legacyMine.map((conversation) => {
-        const pair = safeTwoParticipants(conversation.participants);
-        if (!pair) return conversation;
-        const { participantA, participantB } = normalizeParticipants(pair[0], pair[1]);
-        return {
-          ...conversation,
-          conversationKey: conversation.conversationKey ?? buildConversationKey(participantA, participantB),
-          participantA: conversation.participantA ?? participantA,
-          participantB: conversation.participantB ?? participantB,
-          participants: [participantA, participantB],
-          lastSeen:
-            conversation.lastSeen ??
-            [
-              { userId: participantA, timestamp: 0 },
-              { userId: participantB, timestamp: 0 },
-            ],
-        };
-      });
+      myConversations = legacyMine.map(toNormalizedLegacyConversation);
     }
 
     const now = Date.now();
@@ -230,8 +251,7 @@ export const getConversations = query({
           .collect();
 
         const unreadCount = messages.filter(
-          (message) =>
-            message.senderId !== args.userId && message.createdAt > lastSeenTimestamp
+          (message) => message.senderId !== args.userId && message.createdAt > lastSeenTimestamp
         ).length;
 
         const typingExpired =
@@ -298,8 +318,8 @@ export const backfillConversationsForUser = mutation({
       const pair = safeTwoParticipants(conversation.participants);
       if (!pair) continue;
       if (!pair.includes(args.userId)) continue;
-      const { participantA, participantB } = normalizeParticipants(pair[0], pair[1]);
 
+      const { participantA, participantB } = normalizeParticipants(pair[0], pair[1]);
       const nextLastSeen =
         conversation.lastSeen ??
         [
@@ -341,14 +361,11 @@ export const markAsRead = mutation({
     if (!conversation) return;
 
     const now = Math.max(Date.now(), conversation.lastMessageTime ?? 0);
-    const existing = conversation.lastSeen ?? [];
-    const hasEntry = existing.some((entry) => entry.userId === args.userId);
-
-    const updatedLastSeen = hasEntry
-      ? existing.map((entry) =>
-          entry.userId === args.userId ? { ...entry, timestamp: now } : entry
-        )
-      : [...existing, { userId: args.userId, timestamp: now }];
+    const updatedLastSeen = upsertLastSeen(
+      conversation.lastSeen as LastSeenEntry[] | undefined,
+      args.userId,
+      now
+    );
 
     await ctx.db.patch(args.conversationId, {
       lastSeen: updatedLastSeen,
