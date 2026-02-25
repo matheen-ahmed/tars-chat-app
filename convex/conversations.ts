@@ -230,13 +230,8 @@ export const getConversations = query({
           .collect();
 
         const unreadCount = messages.filter(
-          (message) => {
-            if (message.senderId === args.userId) return false;
-            const seenBy = Array.isArray(message.seenBy) ? message.seenBy : [];
-            const unseenByArray = !seenBy.includes(args.userId);
-            const newerThanLastSeen = message.createdAt > lastSeenTimestamp;
-            return unseenByArray || newerThanLastSeen;
-          }
+          (message) =>
+            message.senderId !== args.userId && message.createdAt > lastSeenTimestamp
         ).length;
 
         const typingExpired =
@@ -344,20 +339,6 @@ export const markAsRead = mutation({
   handler: async (ctx, args) => {
     const conversation = await ctx.db.get(args.conversationId);
     if (!conversation) return;
-
-    const messages = await ctx.db
-      .query("messages")
-      .withIndex("by_conversation", (q) => q.eq("conversationId", args.conversationId))
-      .collect();
-
-    for (const message of messages) {
-      if (message.senderId === args.userId) continue;
-      const seenBy = Array.isArray(message.seenBy) ? message.seenBy : [];
-      if (seenBy.includes(args.userId)) continue;
-      await ctx.db.patch(message._id, {
-        seenBy: [...seenBy, args.userId],
-      });
-    }
 
     const now = Math.max(Date.now(), conversation.lastMessageTime ?? 0);
     const existing = conversation.lastSeen ?? [];
