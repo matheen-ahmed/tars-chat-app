@@ -28,6 +28,9 @@ export default function ChatPage() {
   const [typingNow, setTypingNow] = useState(() => Date.now());
   const [isNearBottomState, setIsNearBottomState] = useState(true);
   const [isDesktop, setIsDesktop] = useState(false);
+  const [isWindowActive, setIsWindowActive] = useState(() =>
+    typeof document !== "undefined" ? document.visibilityState === "visible" : true
+  );
 
   const listRef = useRef<HTMLDivElement | null>(null);
   const typingTimeoutRef = useRef<number | null>(null);
@@ -197,6 +200,22 @@ export default function ChatPage() {
     return () => media.removeEventListener("change", apply);
   }, []);
 
+  useEffect(() => {
+    const updateActiveState = () =>
+      setIsWindowActive(document.visibilityState === "visible" && document.hasFocus());
+
+    updateActiveState();
+    document.addEventListener("visibilitychange", updateActiveState);
+    window.addEventListener("focus", updateActiveState);
+    window.addEventListener("blur", updateActiveState);
+
+    return () => {
+      document.removeEventListener("visibilitychange", updateActiveState);
+      window.removeEventListener("focus", updateActiveState);
+      window.removeEventListener("blur", updateActiveState);
+    };
+  }, []);
+
   const didBackfillRef = useRef(false);
   useEffect(() => {
     if (!me || didBackfillRef.current) return;
@@ -205,7 +224,8 @@ export default function ChatPage() {
   }, [backfillConversationsForUser, me]);
 
   const messageCount = messages?.length ?? 0;
-  const isConversationVisible = !!conversationId && !!me && (isDesktop || !showMobileList);
+  const isConversationVisible =
+    !!conversationId && !!me && (isDesktop || !showMobileList) && isWindowActive;
 
   useEffect(() => {
     if (!conversationId || !me || !isConversationVisible) return;
