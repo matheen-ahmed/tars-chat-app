@@ -24,6 +24,9 @@ export default function RootLayout({
   return (
     <ClerkProvider>
       <html lang="en">
+        <head>
+          <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+        </head>
         <body>
           {convexClient ? (
             <ConvexProvider client={convexClient}>{children}</ConvexProvider>

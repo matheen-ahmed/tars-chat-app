@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="ChatApp icon">
+  <defs>
+    <linearGradient id="bubble" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#3eb5ee" />
+      <stop offset="100%" stop-color="#1f86d2" />
+    </linearGradient>
+  </defs>
+
+  <circle cx="256" cy="256" r="252" fill="#f7fbff" />
+  <circle cx="256" cy="256" r="239" fill="none" stroke="#2aa7e8" stroke-width="12" />
+
+  <g transform="translate(64 100)">
+    <ellipse cx="192" cy="146" rx="172" ry="120" fill="url(#bubble)" />
+    <path d="M108 244 L82 336 L154 274 Z" fill="url(#bubble)" />
+
+    <path
+      d="M220 74 L178 154 L222 166 L188 244 L268 150 L228 138 L262 78 Z"
+      fill="#ffffff"
+      stroke="#d7e5f2"
+      stroke-width="3"
+      stroke-linejoin="round"
+    />
+  </g>
+</svg>
