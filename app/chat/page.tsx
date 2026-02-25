@@ -27,6 +27,7 @@ export default function ChatPage() {
   const [syncError, setSyncError] = useState<string | null>(null);
   const [typingNow, setTypingNow] = useState(() => Date.now());
   const [isNearBottomState, setIsNearBottomState] = useState(true);
+  const [isDesktop, setIsDesktop] = useState(false);
 
   const listRef = useRef<HTMLDivElement | null>(null);
   const typingTimeoutRef = useRef<number | null>(null);
@@ -188,6 +189,14 @@ export default function ChatPage() {
     return () => window.clearInterval(timer);
   }, []);
 
+  useEffect(() => {
+    const media = window.matchMedia("(min-width: 768px)");
+    const apply = () => setIsDesktop(media.matches);
+    apply();
+    media.addEventListener("change", apply);
+    return () => media.removeEventListener("change", apply);
+  }, []);
+
   const didBackfillRef = useRef(false);
   useEffect(() => {
     if (!me || didBackfillRef.current) return;
@@ -196,11 +205,12 @@ export default function ChatPage() {
   }, [backfillConversationsForUser, me]);
 
   const messageCount = messages?.length ?? 0;
+  const isConversationVisible = !!conversationId && !!me && (isDesktop || !showMobileList);
 
   useEffect(() => {
-    if (!conversationId || !me) return;
+    if (!conversationId || !me || !isConversationVisible) return;
     void markAsRead({ conversationId, userId: me._id });
-  }, [conversationId, markAsRead, me, messageCount]);
+  }, [conversationId, isConversationVisible, markAsRead, me, messageCount]);
 
   useEffect(() => {
     if (!listRef.current || messageCount === 0) return;
