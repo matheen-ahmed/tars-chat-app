@@ -1,6 +1,6 @@
 "use client";
 
-import type { ConvDoc, ContactDrawerData, UserDoc } from "./types";
+import type { ConvDoc, ContactDrawerData, UserDoc } from "../lib/types";
 
 type ChatHeaderProps = {
   selectedConversation: ConvDoc;
@@ -111,3 +111,4 @@ export function ChatHeader({
     </header>
   );
 }
+

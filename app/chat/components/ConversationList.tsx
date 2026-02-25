@@ -1,8 +1,8 @@
 "use client";
 
 import type { Id } from "../../../convex/_generated/dataModel";
-import type { ConvDoc, UserDoc } from "./types";
-import { formatTimestamp } from "./utils";
+import type { ConvDoc, UserDoc } from "../lib/types";
+import { formatTimestamp } from "../lib/utils";
 
 type ConversationListProps = {
   activeTab: "chats" | "groups";
@@ -180,3 +180,4 @@ export function ConversationList({
     </div>
   );
 }
+

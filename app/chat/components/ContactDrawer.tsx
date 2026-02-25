@@ -2,7 +2,7 @@
 
 import { useState, type ChangeEvent, type RefObject } from "react";
 import { X, Pencil } from "lucide-react";
-import type { ContactDrawerData } from "./types";
+import type { ContactDrawerData } from "../lib/types";
 
 type ContactDrawerProps = {
   contactDrawer: ContactDrawerData | null;
@@ -154,3 +154,4 @@ export function ContactDrawer({
     </div>
   );
 }
+

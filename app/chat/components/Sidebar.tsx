@@ -4,7 +4,7 @@ import { Search, UserCircle2 } from "lucide-react";
 import { UserButton } from "@clerk/nextjs";
 import Image from "next/image";
 import { ConversationList } from "./ConversationList";
-import type { ConvDoc, ContactDrawerData, UserDoc } from "./types";
+import type { ConvDoc, ContactDrawerData, UserDoc } from "../lib/types";
 import type { Id } from "../../../convex/_generated/dataModel";
 
 type SidebarProps = {
@@ -149,3 +149,4 @@ export function Sidebar({
     </aside>
   );
 }
+

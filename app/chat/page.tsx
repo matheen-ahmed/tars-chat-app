@@ -19,8 +19,8 @@ import type {
   MessageDoc,
   MessageUi,
   UserDoc,
-} from "./components/types";
-import { REACTIONS, formatTimestamp, nearBottom } from "./components/utils";
+} from "./lib/types";
+import { REACTIONS, formatTimestamp, nearBottom } from "./lib/utils";
 
 const PRESENCE_PING_MS = 15_000;
 const TYPING_IDLE_MS = 2_000;
@@ -1041,3 +1041,4 @@ export default function ChatPage() {
     </div>
   );
 }
+

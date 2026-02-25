@@ -13,7 +13,7 @@ import {
   Trash2,
 } from "lucide-react";
 import type { Id } from "../../../convex/_generated/dataModel";
-import { REACTIONS } from "./utils";
+import { REACTIONS } from "../lib/utils";
 
 type MessageMenuProps = {
   mine: boolean;
@@ -174,3 +174,4 @@ export function MessageMenu({
     </div>
   );
 }
+

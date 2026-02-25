@@ -2,8 +2,8 @@
 
 import type { RefObject } from "react";
 import type { Id } from "../../../convex/_generated/dataModel";
-import type { ConvDoc, MessageDoc, MessageUi, UserDoc } from "./types";
-import { nearBottom } from "./utils";
+import type { ConvDoc, MessageDoc, MessageUi, UserDoc } from "../lib/types";
+import { nearBottom } from "../lib/utils";
 import { MessageItem } from "./MessageItem";
 
 type MessageListProps = {
@@ -122,3 +122,4 @@ export function MessageList({
     </div>
   );
 }
+

@@ -3,7 +3,7 @@
 import type { ChangeEvent, RefObject } from "react";
 import { PlusCircle, X } from "lucide-react";
 import type { Id } from "../../../convex/_generated/dataModel";
-import type { MessageDoc } from "./types";
+import type { MessageDoc } from "../lib/types";
 
 type MessageInputProps = {
   selectMode: boolean;
@@ -149,3 +149,4 @@ export function MessageInput({
     </footer>
   );
 }
+

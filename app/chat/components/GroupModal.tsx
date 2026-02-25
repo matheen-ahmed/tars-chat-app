@@ -1,7 +1,7 @@
 "use client";
 
 import type { Id } from "../../../convex/_generated/dataModel";
-import type { UserDoc } from "./types";
+import type { UserDoc } from "../lib/types";
 
 type GroupModalProps = {
   open: boolean;
@@ -99,3 +99,4 @@ export function GroupModal({
     </div>
   );
 }
+

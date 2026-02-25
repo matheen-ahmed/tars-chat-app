@@ -1,7 +1,7 @@
 "use client";
 
 import type { Id } from "../../../convex/_generated/dataModel";
-import type { ConvDoc, UserDoc } from "./types";
+import type { ConvDoc, UserDoc } from "../lib/types";
 
 type ForwardModalProps = {
   open: boolean;
@@ -61,3 +61,4 @@ export function ForwardModal({
     </div>
   );
 }
+

@@ -2,8 +2,8 @@
 
 import { Check, CheckCheck, ChevronDown, Pin, Star } from "lucide-react";
 import type { Id } from "../../../convex/_generated/dataModel";
-import { REACTIONS, formatTimestamp } from "./utils";
-import type { ConvDoc, MessageDoc, MessageUi, UserDoc } from "./types";
+import { REACTIONS, formatTimestamp } from "../lib/utils";
+import type { ConvDoc, MessageDoc, MessageUi, UserDoc } from "../lib/types";
 import { MessageMenu } from "./MessageMenu";
 
 type MessageItemProps = {
@@ -202,5 +202,6 @@ export function MessageItem({
     </div>
   );
 }
+
 
 
