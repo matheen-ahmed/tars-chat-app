@@ -37,6 +37,7 @@ export default function ChatPage() {
   const sendMessage = useMutation(api.conversations.sendMessage);
   const setTyping = useMutation(api.conversations.setTyping);
   const markAsRead = useMutation(api.conversations.markAsRead);
+  const backfillConversationsForUser = useMutation(api.conversations.backfillConversationsForUser);
 
   const users = useQuery(api.users.getUsers, user ? { clerkId: user.id } : "skip") as
     | UserDoc[]
@@ -185,6 +186,13 @@ export default function ChatPage() {
     return () => window.clearInterval(timer);
   }, []);
 
+  const didBackfillRef = useRef(false);
+  useEffect(() => {
+    if (!me || didBackfillRef.current) return;
+    didBackfillRef.current = true;
+    void backfillConversationsForUser({ userId: me._id });
+  }, [backfillConversationsForUser, me]);
+
   const messageCount = messages?.length ?? 0;
 
   useEffect(() => {
@@ -322,6 +330,7 @@ export default function ChatPage() {
         usersById={usersById}
         conversationTitle={conversationTitle}
         conversationSubtitle={conversationSubtitle}
+        typingNow={typingNow}
         onOpenConversation={openConversation}
         onOpenUserChat={(profile) => void openUserChat(profile)}
       />

@@ -272,6 +272,54 @@ export const backfillConversationIndexes = mutation({
   },
 });
 
+export const backfillConversationsForUser = mutation({
+  args: {
+    userId: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    const conversations = await ctx.db.query("conversations").collect();
+    let patched = 0;
+
+    for (const conversation of conversations) {
+      if (conversation.participants.length !== 2) continue;
+      if (!conversation.participants.includes(args.userId)) continue;
+
+      const { participantA, participantB } = normalizeParticipants(
+        conversation.participants[0],
+        conversation.participants[1]
+      );
+
+      const nextLastSeen =
+        conversation.lastSeen ??
+        [
+          { userId: participantA, timestamp: 0 },
+          { userId: participantB, timestamp: 0 },
+        ];
+
+      const needsPatch =
+        !conversation.conversationKey ||
+        !conversation.participantA ||
+        !conversation.participantB ||
+        conversation.participants[0] !== participantA ||
+        conversation.participants[1] !== participantB ||
+        !conversation.lastSeen;
+
+      if (!needsPatch) continue;
+
+      await ctx.db.patch(conversation._id, {
+        conversationKey: buildConversationKey(participantA, participantB),
+        participantA,
+        participantB,
+        participants: [participantA, participantB],
+        lastSeen: nextLastSeen,
+      });
+      patched += 1;
+    }
+
+    return patched;
+  },
+});
+
 export const markAsRead = mutation({
   args: {
     conversationId: v.id("conversations"),

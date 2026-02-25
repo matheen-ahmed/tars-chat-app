@@ -23,6 +23,7 @@ type SidebarProps = {
   usersById: Map<string, UserDoc>;
   conversationTitle: (conversation: ConvDoc) => string;
   conversationSubtitle: (conversation: ConvDoc) => string;
+  typingNow: number;
   onOpenConversation: (id: Id<"conversations">) => void;
   onOpenUserChat: (user: UserDoc) => void;
 };
@@ -43,6 +44,7 @@ export function Sidebar({
   usersById,
   conversationTitle,
   conversationSubtitle,
+  typingNow,
   onOpenConversation,
   onOpenUserChat,
 }: SidebarProps) {
@@ -151,7 +153,8 @@ export function Sidebar({
               const isTyping =
                 !!conversation.typing?.isTyping &&
                 !!me &&
-                conversation.typing.userId !== me._id;
+                conversation.typing.userId !== me._id &&
+                typingNow - conversation.typing.updatedAt <= 2_000;
               const hasUnread = conversation.unreadCount > 0;
               return (
                 <button
@@ -176,41 +179,46 @@ export function Sidebar({
                     />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="truncate text-sm font-semibold text-[#e9edef]">
-                        {conversationTitle(conversation)}
-                      </p>
-                      {!!conversation.lastMessageTime && (
-                        <span
-                          className={`shrink-0 text-xs ${
-                            hasUnread ? "font-semibold text-[#25d366]" : "text-[#8696a0]"
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-semibold text-[#e9edef]">
+                          {conversationTitle(conversation)}
+                        </p>
+                        <p
+                          className={`mt-1 truncate text-xs ${
+                            isTyping
+                              ? "font-semibold lowercase text-[#25d366]"
+                              : "text-[#8696a0]"
                           }`}
                         >
-                          {formatTimestamp(conversation.lastMessageTime)}
-                        </span>
-                      )}
+                          {isTyping
+                            ? "typing..."
+                            : conversation.lastMessage?.trim()
+                              ? conversation.lastMessage
+                              : "No messages yet"}
+                        </p>
+                        <p className="truncate text-[11px] text-[#6d7d86]">
+                          {conversationSubtitle(conversation)}
+                        </p>
+                      </div>
+
+                      <div className="flex shrink-0 flex-col items-end gap-1">
+                        {!!conversation.lastMessageTime && (
+                          <span
+                            className={`text-xs ${
+                              hasUnread ? "font-semibold text-[#25d366]" : "text-[#8696a0]"
+                            }`}
+                          >
+                            {formatTimestamp(conversation.lastMessageTime)}
+                          </span>
+                        )}
+                        {hasUnread && (
+                          <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-[#25d366] px-2 text-xs font-extrabold text-[#071a12]">
+                            {conversation.unreadCount}
+                          </span>
+                        )}
+                      </div>
                     </div>
-                    <div className="mt-1 flex items-center justify-between gap-2">
-                      <p
-                        className={`truncate text-xs ${
-                          isTyping ? "font-semibold lowercase text-[#25d366]" : "text-[#8696a0]"
-                        }`}
-                      >
-                        {isTyping
-                          ? "typing..."
-                          : conversation.lastMessage?.trim()
-                            ? conversation.lastMessage
-                            : "No messages yet"}
-                      </p>
-                      {hasUnread && (
-                        <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-[#25d366] px-2 text-xs font-extrabold text-[#071a12]">
-                          {conversation.unreadCount}
-                        </span>
-                      )}
-                    </div>
-                    <p className="truncate text-[11px] text-[#6d7d86]">
-                      {conversationSubtitle(conversation)}
-                    </p>
                   </div>
                 </button>
               );
