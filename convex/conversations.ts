@@ -133,9 +133,18 @@ export const sendMessage = mutation({
       seenBy: [args.senderId],
     });
 
+    const lastSeen = conversation.lastSeen ?? [];
+    const hasSenderLastSeen = lastSeen.some((entry) => entry.userId === args.senderId);
+    const nextLastSeen = hasSenderLastSeen
+      ? lastSeen.map((entry) =>
+          entry.userId === args.senderId ? { ...entry, timestamp: now } : entry
+        )
+      : [...lastSeen, { userId: args.senderId, timestamp: now }];
+
     await ctx.db.patch(conversation._id, {
       lastMessage: trimmedContent,
       lastMessageTime: now,
+      lastSeen: nextLastSeen,
       typing: {
         userId: args.senderId,
         isTyping: false,
@@ -202,17 +211,13 @@ export const getConversations = query({
     const now = Date.now();
     const results = await Promise.all(
       myConversations.map(async (conversation) => {
-        const lastSeenEntries = conversation.lastSeen ?? [];
-        const seenRecord = lastSeenEntries.find((lastSeen) => lastSeen.userId === args.userId);
-        const lastSeenTimestamp = seenRecord?.timestamp ?? 0;
-
         const messages = await ctx.db
           .query("messages")
           .withIndex("by_conversation", (q) => q.eq("conversationId", conversation._id))
           .collect();
 
         const unreadCount = messages.filter(
-          (message) => message.senderId !== args.userId && message.createdAt > lastSeenTimestamp
+          (message) => message.senderId !== args.userId && !message.seenBy.includes(args.userId)
         ).length;
 
         const typingExpired =
@@ -275,6 +280,19 @@ export const markAsRead = mutation({
   handler: async (ctx, args) => {
     const conversation = await ctx.db.get(args.conversationId);
     if (!conversation) return;
+
+    const messages = await ctx.db
+      .query("messages")
+      .withIndex("by_conversation", (q) => q.eq("conversationId", args.conversationId))
+      .collect();
+
+    for (const message of messages) {
+      if (message.senderId === args.userId) continue;
+      if (message.seenBy.includes(args.userId)) continue;
+      await ctx.db.patch(message._id, {
+        seenBy: [...message.seenBy, args.userId],
+      });
+    }
 
     const now = Math.max(Date.now(), conversation.lastMessageTime ?? 0);
     const existing = conversation.lastSeen ?? [];

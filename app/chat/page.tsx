@@ -25,6 +25,7 @@ export default function ChatPage() {
   const [showNewMessages, setShowNewMessages] = useState(false);
   const [isSyncingProfile, setIsSyncingProfile] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
+  const [typingNow, setTypingNow] = useState(() => Date.now());
 
   const listRef = useRef<HTMLDivElement | null>(null);
   const typingTimeoutRef = useRef<number | null>(null);
@@ -172,11 +173,17 @@ export default function ChatPage() {
 
   const typingText = useMemo(() => {
     if (!selectedConversation?.typing?.isTyping || !me) return "";
+    if (typingNow - selectedConversation.typing.updatedAt > TYPING_IDLE_MS) return "";
     if (selectedConversation.typing.userId === me._id) return "";
 
     const typer = usersById.get(String(selectedConversation.typing.userId));
     return `${typer?.name || "Someone"} is typing...`;
-  }, [me, selectedConversation, usersById]);
+  }, [me, selectedConversation, typingNow, usersById]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setTypingNow(Date.now()), 500);
+    return () => window.clearInterval(timer);
+  }, []);
 
   const messageCount = messages?.length ?? 0;
 
@@ -237,6 +244,14 @@ export default function ChatPage() {
     setMessageText(value);
 
     if (!conversationId || !me) return;
+
+    if (!value.trim()) {
+      if (typingTimeoutRef.current) {
+        window.clearTimeout(typingTimeoutRef.current);
+      }
+      void setTyping({ conversationId, userId: me._id, isTyping: false });
+      return;
+    }
 
     void setTyping({ conversationId, userId: me._id, isTyping: true });
     if (typingTimeoutRef.current) {
