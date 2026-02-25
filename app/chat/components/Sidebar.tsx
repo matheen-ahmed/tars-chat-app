@@ -148,6 +148,11 @@ export function Sidebar({
                   ),
                 ),
               );
+              const isTyping =
+                !!conversation.typing?.isTyping &&
+                !!me &&
+                conversation.typing.userId !== me._id;
+              const hasUnread = conversation.unreadCount > 0;
               return (
                 <button
                   key={conversation._id}
@@ -176,19 +181,29 @@ export function Sidebar({
                         {conversationTitle(conversation)}
                       </p>
                       {!!conversation.lastMessageTime && (
-                        <span className="shrink-0 text-xs text-[#8696a0]">
+                        <span
+                          className={`shrink-0 text-xs ${
+                            hasUnread ? "font-semibold text-[#25d366]" : "text-[#8696a0]"
+                          }`}
+                        >
                           {formatTimestamp(conversation.lastMessageTime)}
                         </span>
                       )}
                     </div>
                     <div className="mt-1 flex items-center justify-between gap-2">
-                      <p className="truncate text-xs text-[#8696a0]">
-                        {conversation.lastMessage?.trim()
-                          ? conversation.lastMessage
-                          : "No messages yet"}
+                      <p
+                        className={`truncate text-xs ${
+                          isTyping ? "font-semibold lowercase text-[#25d366]" : "text-[#8696a0]"
+                        }`}
+                      >
+                        {isTyping
+                          ? "typing..."
+                          : conversation.lastMessage?.trim()
+                            ? conversation.lastMessage
+                            : "No messages yet"}
                       </p>
-                      {conversation.unreadCount > 0 && (
-                        <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-[#128c7e] px-2 py-0.5 text-xs font-extrabold text-[#102126]">
+                      {hasUnread && (
+                        <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-[#25d366] px-2 text-xs font-extrabold text-[#071a12]">
                           {conversation.unreadCount}
                         </span>
                       )}
