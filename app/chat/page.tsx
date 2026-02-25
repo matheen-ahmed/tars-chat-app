@@ -3,7 +3,7 @@
 import { useUser } from "@clerk/nextjs";
 import { useMutation, useQuery } from "convex/react";
 import { X } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { ChatHeader } from "./components/ChatHeader";
@@ -66,6 +66,8 @@ export default function ChatPage() {
   const [profileSaving, setProfileSaving] = useState(false);
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
   const [imagePreviewName, setImagePreviewName] = useState<string>("");
+  const [syncingProfile, setSyncingProfile] = useState(false);
+  const [syncError, setSyncError] = useState<string | null>(null);
 
   const listRef = useRef<HTMLDivElement | null>(null);
   const typingRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -111,15 +113,33 @@ export default function ChatPage() {
   ) as MessageUi[] | undefined;
   const messageCount = messages?.length ?? 0;
 
-  useEffect(() => {
+  const syncCurrentUser = useCallback(async () => {
     if (!user) return;
-    void syncUser({
-      clerkId: user.id,
-      name: user.fullName || "User",
-      email: user.primaryEmailAddress?.emailAddress || "",
-      image: user.imageUrl,
-    });
+    setSyncingProfile(true);
+    setSyncError(null);
+    try {
+      await syncUser({
+        clerkId: user.id,
+        name: user.fullName || "User",
+        email: user.primaryEmailAddress?.emailAddress || "",
+        image: user.imageUrl,
+      });
+    } catch {
+      setSyncError("Unable to reach chat server. Check internet/Convex URL and retry.");
+    } finally {
+      setSyncingProfile(false);
+    }
   }, [syncUser, user]);
+
+  useEffect(() => {
+    void syncCurrentUser();
+  }, [syncCurrentUser]);
+
+  useEffect(() => {
+    if (!user || me !== null || me === undefined) return;
+    const timer = window.setTimeout(() => void syncCurrentUser(), 1200);
+    return () => window.clearTimeout(timer);
+  }, [me, syncCurrentUser, user]);
 
   useEffect(() => {
     if (!user) return;
@@ -765,7 +785,7 @@ export default function ChatPage() {
     );
   }
 
-  const loadingData = !users || !me || !conversations;
+  const loadingData = users === undefined || me === undefined || (!!me && conversations === undefined);
   const loadingMessages = !!cid && messages === undefined;
 
   return (
@@ -775,6 +795,10 @@ export default function ChatPage() {
         onTabChange={setSidebarTab}
         mobileList={mobileList}
         me={me}
+        syncingProfile={syncingProfile}
+        syncError={syncError}
+        currentUserMissing={me === null}
+        onRetrySync={() => void syncCurrentUser()}
         search={search}
         onSearchChange={setSearch}
         onOpenGroup={() => setGroupOpen(true)}

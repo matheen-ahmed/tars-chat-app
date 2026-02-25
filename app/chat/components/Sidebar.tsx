@@ -12,6 +12,10 @@ type SidebarProps = {
   onTabChange: (tab: "chats" | "groups") => void;
   mobileList: boolean;
   me?: UserDoc | null;
+  syncingProfile: boolean;
+  syncError: string | null;
+  currentUserMissing: boolean;
+  onRetrySync: () => void;
   search: string;
   onSearchChange: (value: string) => void;
   onOpenGroup: () => void;
@@ -34,6 +38,10 @@ export function Sidebar({
   onTabChange,
   mobileList,
   me,
+  syncingProfile,
+  syncError,
+  currentUserMissing,
+  onRetrySync,
   search,
   onSearchChange,
   onOpenGroup,
@@ -129,6 +137,20 @@ export function Sidebar({
             </button>
           )}
         </div>
+        {(syncError || currentUserMissing) && (
+          <div className="rounded-lg border border-[#3b4a54] bg-[#1f2c34] p-3">
+            <p className="text-xs text-[#d1d7db]">
+              {syncError || "Setting up your profile. If this takes long, retry."}
+            </p>
+            <button
+              onClick={onRetrySync}
+              disabled={syncingProfile}
+              className="mt-2 rounded-md bg-[#00a884] px-3 py-1 text-xs font-semibold text-white disabled:bg-[#2f655d]"
+            >
+              {syncingProfile ? "Retrying..." : "Retry"}
+            </button>
+          </div>
+        )}
       </div>
 
       <ConversationList
