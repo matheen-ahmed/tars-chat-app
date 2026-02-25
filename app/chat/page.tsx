@@ -230,7 +230,7 @@ export default function ChatPage() {
   useEffect(() => {
     if (!conversationId || !me || !isConversationVisible) return;
     void markAsRead({ conversationId, userId: me._id });
-  }, [conversationId, isConversationVisible, markAsRead, me, messageCount]);
+  }, [conversationId, isConversationVisible, markAsRead, me]);
 
   useEffect(() => {
     if (!listRef.current || messageCount === 0) return;
@@ -386,7 +386,13 @@ export default function ChatPage() {
           <>
             <header className="flex items-center border-b border-white/10 bg-[#1a252d]/70 px-4 py-2.5 text-white backdrop-blur-xl md:px-5">
               <button
-                onClick={() => setShowMobileList(true)}
+                onClick={() => {
+                  setShowMobileList(true);
+                  setConversationId(null);
+                  setShowNewMessages(false);
+                  setIsNearBottomState(true);
+                  prevMessageCountRef.current = 0;
+                }}
                 className="mr-3 rounded-full p-2 text-[#d1d7db] hover:bg-white/10 md:hidden"
                 aria-label="Back"
               >
