@@ -144,7 +144,7 @@ export function ChatOverlays({
         onPickProfileImage={onPickProfileImage}
         hasPendingProfileImage={hasPendingProfileImage}
         profileSaving={profileSaving}
-        onSaveProfileImage={() => void onSaveProfileImage()}
+        onSaveProfileImage={onSaveProfileImage}
         onCancelProfileImage={onCancelProfileImage}
         onUpdateProfileName={onUpdateProfileName}
       />
@@ -241,7 +241,7 @@ export function ChatOverlays({
         groupErr={groupErr}
         groupBusy={groupBusy}
         onClose={onCloseGroupModal}
-        onCreate={() => void onCreateGroup()}
+        onCreate={onCreateGroup}
       />
     </>
   );
