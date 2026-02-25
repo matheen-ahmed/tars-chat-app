@@ -190,7 +190,7 @@ export default function ChatPage() {
   useEffect(() => {
     if (!me || didBackfillRef.current) return;
     didBackfillRef.current = true;
-    void backfillConversationsForUser({ userId: me._id });
+    void backfillConversationsForUser({ userId: me._id }).catch(() => {});
   }, [backfillConversationsForUser, me]);
 
   const messageCount = messages?.length ?? 0;
@@ -257,16 +257,16 @@ export default function ChatPage() {
       if (typingTimeoutRef.current) {
         window.clearTimeout(typingTimeoutRef.current);
       }
-      void setTyping({ conversationId, userId: me._id, isTyping: false });
+      void setTyping({ conversationId, userId: me._id, isTyping: false }).catch(() => {});
       return;
     }
 
-    void setTyping({ conversationId, userId: me._id, isTyping: true });
+    void setTyping({ conversationId, userId: me._id, isTyping: true }).catch(() => {});
     if (typingTimeoutRef.current) {
       window.clearTimeout(typingTimeoutRef.current);
     }
     typingTimeoutRef.current = window.setTimeout(() => {
-      void setTyping({ conversationId, userId: me._id, isTyping: false });
+      void setTyping({ conversationId, userId: me._id, isTyping: false }).catch(() => {});
     }, TYPING_IDLE_MS);
   };
 
@@ -288,7 +288,7 @@ export default function ChatPage() {
         return;
       }
 
-      await setTyping({ conversationId, userId: me._id, isTyping: false });
+      await setTyping({ conversationId, userId: me._id, isTyping: false }).catch(() => {});
       setMessageText("");
       if (listRef.current) {
         listRef.current.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
@@ -436,7 +436,7 @@ export default function ChatPage() {
                 }}
                 className="mx-auto -mt-14 mb-2 rounded-full bg-[#25d366] px-4 py-2 text-sm font-medium text-white shadow-md"
               >
-                ↓ New messages
+                ? New messages
               </button>
             )}
 
@@ -448,7 +448,7 @@ export default function ChatPage() {
                   onChange={(event) => onType(event.target.value)}
                   onBlur={() => {
                     if (!conversationId || !me) return;
-                    void setTyping({ conversationId, userId: me._id, isTyping: false });
+                    void setTyping({ conversationId, userId: me._id, isTyping: false }).catch(() => {});
                   }}
                   onKeyDown={(event) => {
                     if (event.key === "Enter" && !event.shiftKey) {
@@ -474,3 +474,4 @@ export default function ChatPage() {
     </div>
   );
 }
+

@@ -15,6 +15,13 @@ const buildConversationKey = (user1: Id<"users">, user2: Id<"users">) => {
   return `${String(participantA)}:${String(participantB)}`;
 };
 
+const safeTwoParticipants = (value: unknown): [Id<"users">, Id<"users">] | null => {
+  if (!Array.isArray(value) || value.length !== 2) return null;
+  const [first, second] = value;
+  if (!first || !second) return null;
+  return [first as Id<"users">, second as Id<"users">];
+};
+
 export const getOrCreateConversation = mutation({
   args: {
     user1: v.id("users"),
@@ -55,10 +62,11 @@ export const getOrCreateConversation = mutation({
     // Backward-compatibility fallback for legacy rows that predate conversationKey.
     const legacyConversations = await ctx.db.query("conversations").collect();
     const legacyExisting = legacyConversations.find(
-      (conversation) =>
-        conversation.participants.length === 2 &&
-        conversation.participants.includes(args.user1) &&
-        conversation.participants.includes(args.user2)
+      (conversation) => {
+        const pair = safeTwoParticipants(conversation.participants);
+        if (!pair) return false;
+        return pair.includes(args.user1) && pair.includes(args.user2);
+      }
     );
     if (legacyExisting) {
       await ctx.db.patch(legacyExisting._id, {
@@ -183,15 +191,16 @@ export const getConversations = query({
     // Backward-compatibility fallback for legacy rows without indexed participant fields.
     if (myConversations.length === 0) {
       const legacyConversations = await ctx.db.query("conversations").collect();
-      const legacyMine = legacyConversations.filter((conversation) =>
-        conversation.participants.includes(args.userId)
-      );
+      const legacyMine = legacyConversations.filter((conversation) => {
+        const pair = safeTwoParticipants(conversation.participants);
+        if (!pair) return false;
+        return pair.includes(args.userId);
+      });
 
       myConversations = legacyMine.map((conversation) => {
-        const { participantA, participantB } = normalizeParticipants(
-          conversation.participants[0],
-          conversation.participants[1]
-        );
+        const pair = safeTwoParticipants(conversation.participants);
+        if (!pair) return conversation;
+        const { participantA, participantB } = normalizeParticipants(pair[0], pair[1]);
         return {
           ...conversation,
           conversationKey: conversation.conversationKey ?? buildConversationKey(participantA, participantB),
@@ -211,13 +220,23 @@ export const getConversations = query({
     const now = Date.now();
     const results = await Promise.all(
       myConversations.map(async (conversation) => {
+        const lastSeenEntries = conversation.lastSeen ?? [];
+        const seenRecord = lastSeenEntries.find((entry) => entry.userId === args.userId);
+        const lastSeenTimestamp = seenRecord?.timestamp ?? 0;
+
         const messages = await ctx.db
           .query("messages")
           .withIndex("by_conversation", (q) => q.eq("conversationId", conversation._id))
           .collect();
 
         const unreadCount = messages.filter(
-          (message) => message.senderId !== args.userId && !message.seenBy.includes(args.userId)
+          (message) => {
+            if (message.senderId === args.userId) return false;
+            const seenBy = Array.isArray(message.seenBy) ? message.seenBy : [];
+            const unseenByArray = !seenBy.includes(args.userId);
+            const newerThanLastSeen = message.createdAt > lastSeenTimestamp;
+            return unseenByArray || newerThanLastSeen;
+          }
         ).length;
 
         const typingExpired =
@@ -281,13 +300,10 @@ export const backfillConversationsForUser = mutation({
     let patched = 0;
 
     for (const conversation of conversations) {
-      if (conversation.participants.length !== 2) continue;
-      if (!conversation.participants.includes(args.userId)) continue;
-
-      const { participantA, participantB } = normalizeParticipants(
-        conversation.participants[0],
-        conversation.participants[1]
-      );
+      const pair = safeTwoParticipants(conversation.participants);
+      if (!pair) continue;
+      if (!pair.includes(args.userId)) continue;
+      const { participantA, participantB } = normalizeParticipants(pair[0], pair[1]);
 
       const nextLastSeen =
         conversation.lastSeen ??
@@ -336,9 +352,10 @@ export const markAsRead = mutation({
 
     for (const message of messages) {
       if (message.senderId === args.userId) continue;
-      if (message.seenBy.includes(args.userId)) continue;
+      const seenBy = Array.isArray(message.seenBy) ? message.seenBy : [];
+      if (seenBy.includes(args.userId)) continue;
       await ctx.db.patch(message._id, {
-        seenBy: [...message.seenBy, args.userId],
+        seenBy: [...seenBy, args.userId],
       });
     }
 
