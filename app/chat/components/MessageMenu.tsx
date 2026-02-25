@@ -11,6 +11,7 @@ import {
   Reply,
   Star,
   Trash2,
+  X,
 } from "lucide-react";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { REACTIONS } from "../lib/utils";
@@ -37,6 +38,7 @@ type MessageMenuProps = {
   onToggleSelectMode: (messageId: Id<"messages">) => void;
   onDeleteForMe: (messageId: Id<"messages">) => Promise<void>;
   onDeleteForEveryone: (messageId: Id<"messages">) => Promise<void>;
+  onClose: () => void;
 };
 
 export function MessageMenu({
@@ -61,14 +63,10 @@ export function MessageMenu({
   onToggleSelectMode,
   onDeleteForMe,
   onDeleteForEveryone,
+  onClose,
 }: MessageMenuProps) {
-  return (
-    <div
-      onClick={(event) => event.stopPropagation()}
-      className={`absolute z-20 mt-1 w-72 overflow-hidden rounded-2xl border border-[#2f2f2f] bg-[#181b1f] text-[#e6e6e6] shadow-2xl ${
-        mine ? "right-0" : "left-0"
-      }`}
-    >
+  const menuContent = (
+    <>
       <div className="flex items-center gap-1 border-b border-[#343434] px-3 py-2">
         {REACTIONS.map((emoji) => (
           <button
@@ -171,7 +169,38 @@ export function MessageMenu({
           </button>
         )}
       </div>
-    </div>
+    </>
+  );
+
+  return (
+    <>
+      <div className="fixed inset-0 z-30 bg-black/35 md:hidden" onClick={onClose} />
+
+      <div
+        onClick={(event) => event.stopPropagation()}
+        className="fixed inset-x-3 bottom-20 z-40 max-h-[72dvh] overflow-hidden rounded-2xl border border-[#2f2f2f] bg-[#181b1f] text-[#e6e6e6] shadow-2xl md:hidden"
+      >
+        <div className="flex items-center justify-between border-b border-[#2a2f36] px-3 py-2">
+          <p className="text-xs font-semibold uppercase tracking-wide text-[#a9b0b8]">Message Actions</p>
+          <button
+            onClick={onClose}
+            className="rounded-full p-1 text-[#a9b0b8] transition-colors hover:bg-[#252a30] hover:text-[#e6e6e6]"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="max-h-[calc(72dvh-40px)] overflow-y-auto">{menuContent}</div>
+      </div>
+
+      <div
+        onClick={(event) => event.stopPropagation()}
+        className={`absolute z-20 mt-1 hidden w-72 overflow-hidden rounded-2xl border border-[#2f2f2f] bg-[#181b1f] text-[#e6e6e6] shadow-2xl md:block ${
+          mine ? "right-0" : "left-0"
+        }`}
+      >
+        {menuContent}
+      </div>
+    </>
   );
 }
 

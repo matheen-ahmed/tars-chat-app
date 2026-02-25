@@ -217,6 +217,7 @@ export function MessageItem({
             onToggleSelectMode={onToggleSelectMode}
             onDeleteForMe={onDeleteForMe}
             onDeleteForEveryone={onDeleteForEveryone}
+            onClose={() => onToggleMenu(null)}
           />
         )}
 
