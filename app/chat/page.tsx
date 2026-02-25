@@ -2,92 +2,41 @@
 
 import { useUser } from "@clerk/nextjs";
 import { useMutation, useQuery } from "convex/react";
-import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
+import { ArrowLeft } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
-import { ChatMainPanel } from "./components/ChatMainPanel";
-import { ChatOverlays } from "./components/ChatOverlays";
 import { Sidebar } from "./components/Sidebar";
-import type {
-  ContactDrawerData,
-  ConvDoc,
-  MessageDoc,
-  MessageUi,
-  UserDoc,
-} from "./lib/types";
-import { REACTIONS, formatTimestamp, nearBottom } from "./lib/utils";
+import type { ConvDoc, MessageUi, UserDoc } from "./lib/types";
+import { formatTimestamp, nearBottom } from "./lib/utils";
 
 const PRESENCE_PING_MS = 15_000;
 const TYPING_IDLE_MS = 2_000;
-const isGroupConversation = (conversation: ConvDoc) =>
-  !!conversation.isGroup || !!conversation.groupName || conversation.participants.length > 2;
+
+const isDirectConversation = (conversation: ConvDoc) =>
+  !conversation.isGroup && conversation.participants.length === 2;
 
 export default function ChatPage() {
   const { user, isLoaded } = useUser();
+
   const [search, setSearch] = useState("");
-  const [cid, setCid] = useState<Id<"conversations"> | null>(null);
+  const [conversationId, setConversationId] = useState<Id<"conversations"> | null>(null);
+  const [mobileList, setMobileList] = useState(true);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
-  const [sendErr, setSendErr] = useState(false);
-  const [sendRetry, setSendRetry] = useState<{
-    text: string;
-    cid: Id<"conversations">;
-  } | null>(null);
-  const [showNew, setShowNew] = useState(false);
-  const [mobileList, setMobileList] = useState(true);
-  const [sidebarTab, setSidebarTab] = useState<"chats" | "groups">("chats");
-  const [actionErr, setActionErr] = useState<string | null>(null);
-  const [menuMsgId, setMenuMsgId] = useState<Id<"messages"> | null>(null);
-  const [editingMessageId, setEditingMessageId] = useState<Id<"messages"> | null>(null);
-  const [replyToId, setReplyToId] = useState<Id<"messages"> | null>(null);
-  const [infoMessageId, setInfoMessageId] = useState<Id<"messages"> | null>(null);
-  const [forwardMessageId, setForwardMessageId] = useState<Id<"messages"> | null>(null);
-  const [forwardOpen, setForwardOpen] = useState(false);
-  const [selectMode, setSelectMode] = useState(false);
-  const [selectedMessageIds, setSelectedMessageIds] = useState<Id<"messages">[]>([]);
-  const [groupOpen, setGroupOpen] = useState(false);
-  const [groupName, setGroupName] = useState("");
-  const [groupSearch, setGroupSearch] = useState("");
-  const [groupMembers, setGroupMembers] = useState<Id<"users">[]>([]);
-  const [groupBusy, setGroupBusy] = useState(false);
-  const [groupErr, setGroupErr] = useState<string | null>(null);
-  const [renameModalOpen, setRenameModalOpen] = useState(false);
-  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
-  const [renameValue, setRenameValue] = useState("");
-  const [groupActionBusy, setGroupActionBusy] = useState(false);
-  const [contactDrawer, setContactDrawer] = useState<ContactDrawerData | null>(null);
-  const [pendingProfileFile, setPendingProfileFile] = useState<File | null>(null);
-  const [pendingProfilePreview, setPendingProfilePreview] = useState<string | null>(null);
-  const [profileSaving, setProfileSaving] = useState(false);
-  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
-  const [imagePreviewName, setImagePreviewName] = useState<string>("");
-  const [syncingProfile, setSyncingProfile] = useState(false);
-  const [syncError, setSyncError] = useState<string | null>(null);
-
+  const [sendError, setSendError] = useState<string | null>(null);
+  const [showNewMessages, setShowNewMessages] = useState(false);
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
-  const typingRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const profileInputRef = useRef<HTMLInputElement | null>(null);
 
   const syncUser = useMutation(api.users.syncUser);
   const setOnline = useMutation(api.users.setOnlineStatus);
   const heartbeat = useMutation(api.users.heartbeat);
   const getOrCreateConversation = useMutation(api.conversations.getOrCreateConversation);
-  const createGroupConversation = useMutation(api.conversations.createGroupConversation);
-  const renameGroup = useMutation(api.conversations.renameGroup);
-  const deleteGroup = useMutation(api.conversations.deleteGroup);
   const sendMessage = useMutation(api.conversations.sendMessage);
-  const generateUploadUrl = useMutation(api.conversations.generateUploadUrl);
-  const generateProfileUploadUrl = useMutation(api.users.generateProfileUploadUrl);
-  const updateProfileImage = useMutation(api.users.updateProfileImage);
-  const updateProfileName = useMutation(api.users.updateProfileName);
   const setTyping = useMutation(api.conversations.setTyping);
   const markAsRead = useMutation(api.conversations.markAsRead);
   const markMessagesAsSeen = useMutation(api.conversations.markMessagesAsSeen);
-  const toggleReaction = useMutation(api.conversations.toggleReaction);
-  const editMessage = useMutation(api.conversations.editMessage);
-  const togglePin = useMutation(api.conversations.togglePin);
-  const toggleStar = useMutation(api.conversations.toggleStar);
 
   const users = useQuery(api.users.getUsers, user ? { clerkId: user.id } : "skip") as
     | UserDoc[]
@@ -102,26 +51,17 @@ export default function ChatPage() {
   ) as ConvDoc[] | undefined;
   const messages = useQuery(
     api.conversations.getMessages,
-    cid ? { conversationId: cid } : "skip"
+    conversationId ? { conversationId } : "skip"
   ) as MessageUi[] | undefined;
-  const messageCount = messages?.length ?? 0;
 
   const syncCurrentUser = useCallback(async () => {
     if (!user) return;
-    setSyncingProfile(true);
-    setSyncError(null);
-    try {
-      await syncUser({
-        clerkId: user.id,
-        name: user.fullName || "User",
-        email: user.primaryEmailAddress?.emailAddress || "",
-        image: user.imageUrl,
-      });
-    } catch {
-      setSyncError("Unable to reach chat server. Check internet/Convex URL and retry.");
-    } finally {
-      setSyncingProfile(false);
-    }
+    await syncUser({
+      clerkId: user.id,
+      name: user.fullName || "User",
+      email: user.primaryEmailAddress?.emailAddress || "",
+      image: user.imageUrl,
+    });
   }, [syncUser, user]);
 
   useEffect(() => {
@@ -161,580 +101,156 @@ export default function ChatPage() {
     };
   }, [heartbeat, setOnline, user]);
 
-  useEffect(() => {
-    if (!cid || !me) return;
-    void markAsRead({ conversationId: cid, userId: me._id });
-    void markMessagesAsSeen({ conversationId: cid, userId: me._id });
-  }, [cid, me, markAsRead, markMessagesAsSeen, messageCount]);
-
-  useEffect(() => {
-    if (!listRef.current || messageCount === 0) return;
-    if (nearBottom(listRef.current)) {
-      listRef.current.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
-      setShowNew(false);
-    } else {
-      setShowNew(true);
-    }
-  }, [messageCount]);
-
-  useEffect(() => {
-    if (!cid || !me) return;
-    return () => {
-      if (typingRef.current) clearTimeout(typingRef.current);
-      void setTyping({ conversationId: cid, userId: me._id, isTyping: false });
-    };
-  }, [cid, me, setTyping]);
-
-  useEffect(() => {
-    if (!cid || !conversations) return;
-    if (!conversations.some((conversation) => conversation._id === cid)) {
-      setCid(null);
-      setMobileList(true);
-      setText("");
-      setShowNew(false);
-    }
-  }, [cid, conversations]);
-
-  useEffect(() => {
-    if (!menuMsgId) return;
-    const close = () => setMenuMsgId(null);
-    document.addEventListener("click", close);
-    return () => document.removeEventListener("click", close);
-  }, [menuMsgId]);
-
-  useEffect(() => {
-    setRenameModalOpen(false);
-    setDeleteModalOpen(false);
-    setRenameValue("");
-    setGroupActionBusy(false);
-  }, [cid]);
-
-  useEffect(() => {
-    return () => {
-      if (pendingProfilePreview) URL.revokeObjectURL(pendingProfilePreview);
-    };
-  }, [pendingProfilePreview]);
-
   const usersById = useMemo(() => {
     const map = new Map<string, UserDoc>();
     (users || []).forEach((u) => map.set(String(u._id), u));
     return map;
   }, [users]);
 
-  const selectedConv = useMemo(
-    () => conversations?.find((conversation) => conversation._id === cid) ?? null,
-    [cid, conversations]
+  const directConversations = useMemo(
+    () => (conversations || []).filter((conversation) => isDirectConversation(conversation)),
+    [conversations]
   );
 
-  const messagesById = useMemo(() => {
-    const map = new Map<string, MessageDoc>();
-    (messages || []).forEach((message) => map.set(String(message._id), message));
-    return map;
-  }, [messages]);
+  const conversationTitle = useCallback(
+    (conversation: ConvDoc) =>
+      usersById.get(
+        String(conversation.participants.find((participant) => participant !== me?._id))
+      )?.name || "Conversation",
+    [me?._id, usersById]
+  );
 
-  const infoMessage = infoMessageId ? messagesById.get(String(infoMessageId)) || null : null;
-  const replyMessage = replyToId ? messagesById.get(String(replyToId)) || null : null;
-  const forwardMessage =
-    forwardMessageId ? messagesById.get(String(forwardMessageId)) || null : null;
-  const title = (conversation: ConvDoc) =>
-    isGroupConversation(conversation)
-      ? conversation.groupName || "Unnamed Group"
-      : usersById.get(
-          String(conversation.participants.find((participant) => participant !== me?._id))
-        )?.name || "Conversation";
+  const conversationSubtitle = useCallback(
+    (conversation: ConvDoc) => {
+      const other = usersById.get(
+        String(conversation.participants.find((participant) => participant !== me?._id))
+      );
+      return other?.online ? "Online" : "Offline";
+    },
+    [me?._id, usersById]
+  );
 
-  const subtitle = (conversation: ConvDoc) => {
-    if (isGroupConversation(conversation)) return `${conversation.participants.length} members`;
-    const other = usersById.get(
-      String(conversation.participants.find((participant) => participant !== me?._id))
+  const filteredConversations = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    if (!query) return directConversations;
+    return directConversations.filter((conversation) =>
+      conversationTitle(conversation).toLowerCase().includes(query)
     );
-    return other?.online ? "Online" : "Offline";
-  };
-
-  const typingText = (() => {
-    if (!selectedConv?.typing?.isTyping || !me || selectedConv.typing.userId === me._id) {
-      return "";
-    }
-    return `${usersById.get(String(selectedConv.typing.userId))?.name || "Someone"} is typing...`;
-  })();
-  const canManageSelectedGroup =
-    !!selectedConv &&
-    isGroupConversation(selectedConv) &&
-    !!me &&
-    selectedConv.createdBy === me._id;
+  }, [conversationTitle, directConversations, search]);
 
   const filteredUsers = useMemo(() => {
-    if (!users) return [];
     const query = search.trim().toLowerCase();
+    if (!users) return [];
     return query ? users.filter((u) => u.name.toLowerCase().includes(query)) : users;
   }, [search, users]);
 
-  const filteredConversations = useMemo(() => {
-    if (!conversations) return [];
-    const query = search.trim().toLowerCase();
-    if (!query) return conversations;
-
-    return conversations.filter((conversation) => {
-      const conversationTitle = conversation.isGroup
-        ? conversation.groupName || "Unnamed Group"
-        : usersById.get(
-            String(conversation.participants.find((participant) => participant !== me?._id))
-          )?.name || "Conversation";
-      return conversationTitle.toLowerCase().includes(query);
-    });
-  }, [conversations, me?._id, search, usersById]);
-  const filteredChatConversations = useMemo(
-    () => filteredConversations.filter((conversation) => !isGroupConversation(conversation)),
-    [filteredConversations]
-  );
-  const filteredGroupConversations = useMemo(
-    () => filteredConversations.filter((conversation) => isGroupConversation(conversation)),
-    [filteredConversations]
+  const selectedConversation = useMemo(
+    () => directConversations.find((conversation) => conversation._id === conversationId) ?? null,
+    [conversationId, directConversations]
   );
 
-  const filteredGroupUsers = useMemo(() => {
-    if (!users) return [];
-    const query = groupSearch.trim().toLowerCase();
-    if (!query) return users;
-    return users.filter((u) => u.name.toLowerCase().includes(query));
-  }, [groupSearch, users]);
+  const otherUser = useMemo(() => {
+    if (!selectedConversation || !me) return null;
+    return (
+      usersById.get(
+        String(selectedConversation.participants.find((participant) => participant !== me._id))
+      ) || null
+    );
+  }, [me, selectedConversation, usersById]);
+
+  const typingText = useMemo(() => {
+    if (!selectedConversation?.typing?.isTyping || !me) return "";
+    if (selectedConversation.typing.userId === me._id) return "";
+    return `${usersById.get(String(selectedConversation.typing.userId))?.name || "Someone"} is typing...`;
+  }, [me, selectedConversation, usersById]);
+
+  const messageCount = messages?.length ?? 0;
+
+  useEffect(() => {
+    if (!conversationId || !me) return;
+    void markAsRead({ conversationId, userId: me._id });
+    void markMessagesAsSeen({ conversationId, userId: me._id });
+  }, [conversationId, markAsRead, markMessagesAsSeen, me, messageCount]);
+
+  useEffect(() => {
+    if (!listRef.current || messageCount === 0) return;
+    if (nearBottom(listRef.current)) {
+      listRef.current.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
+      setShowNewMessages(false);
+    } else {
+      setShowNewMessages(true);
+    }
+  }, [messageCount]);
+
+  useEffect(() => {
+    if (!conversationId || !me) return;
+    return () => {
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      void setTyping({ conversationId, userId: me._id, isTyping: false });
+    };
+  }, [conversationId, me, setTyping]);
+
+  useEffect(() => {
+    if (!conversationId) return;
+    if (!directConversations.some((conversation) => conversation._id === conversationId)) {
+      setConversationId(null);
+      setMobileList(true);
+      setText("");
+      setShowNewMessages(false);
+    }
+  }, [conversationId, directConversations]);
 
   const openConversation = (id: Id<"conversations">) => {
-    const target = conversations?.find((conversation) => conversation._id === id);
-    if (target) setSidebarTab(isGroupConversation(target) ? "groups" : "chats");
-    setCid(id);
+    setConversationId(id);
     setMobileList(false);
-    setSendErr(false);
-    setSendRetry(null);
-    setActionErr(null);
-    setMenuMsgId(null);
-    setEditingMessageId(null);
-    setReplyToId(null);
-    setSelectMode(false);
-    setSelectedMessageIds([]);
+    setSendError(null);
     if (me) void markAsRead({ conversationId: id, userId: me._id });
   };
 
   const openUserChat = async (targetUser: UserDoc) => {
     if (!me) return;
-    setSidebarTab("chats");
     const id = await getOrCreateConversation({ user1: me._id, user2: targetUser._id });
     openConversation(id);
   };
 
   const onType = (value: string) => {
     setText(value);
-    if (!cid || !me) return;
+    if (!conversationId || !me) return;
 
-    void setTyping({ conversationId: cid, userId: me._id, isTyping: true });
-    if (typingRef.current) clearTimeout(typingRef.current);
-    typingRef.current = setTimeout(
-      () => void setTyping({ conversationId: cid, userId: me._id, isTyping: false }),
+    void setTyping({ conversationId, userId: me._id, isTyping: true });
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    typingTimeoutRef.current = setTimeout(
+      () => void setTyping({ conversationId, userId: me._id, isTyping: false }),
       TYPING_IDLE_MS
     );
   };
 
-  const send = async (retry?: { text: string; cid: Id<"conversations"> }) => {
-    const targetCid = retry?.cid ?? cid;
-    const content = retry?.text ?? text.trim();
-    if (!targetCid || !me || !content || sending) return;
-
+  const onSend = async () => {
+    if (!conversationId || !me || !text.trim() || sending) return;
     setSending(true);
-    setSendErr(false);
+    setSendError(null);
 
     try {
-      if (editingMessageId && !retry) {
-        const edited = await editMessage({
-          messageId: editingMessageId,
-          userId: me._id,
-          content,
-        });
-        if (!edited) {
-          setActionErr("Could not edit message.");
-          return;
-        }
-        setEditingMessageId(null);
-        setText("");
-        return;
-      }
-
       const ok = await sendMessage({
-        conversationId: targetCid,
-        senderId: me._id,
-        content,
-        replyTo: retry ? undefined : replyToId || undefined,
-        forwarded: retry ? false : undefined,
-      });
-
-      if (!ok) {
-        setSendErr(true);
-        setSendRetry({ cid: targetCid, text: content });
-        return;
-      }
-
-      await setTyping({ conversationId: targetCid, userId: me._id, isTyping: false });
-      setSendRetry(null);
-      if (!retry) setText("");
-      if (!retry) setReplyToId(null);
-      if (listRef.current) {
-        listRef.current.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
-      }
-      setShowNew(false);
-    } catch {
-      setSendErr(true);
-      setSendRetry({ cid: targetCid, text: content });
-    } finally {
-      setSending(false);
-    }
-  };
-
-  const startEdit = (mid: Id<"messages">, content: string) => {
-    setEditingMessageId(mid);
-    setText(content);
-    setMenuMsgId(null);
-  };
-
-  const cancelEdit = () => {
-    setEditingMessageId(null);
-    setText("");
-  };
-
-  const react = async (mid: Id<"messages">, emoji: string) => {
-    if (!me) return;
-    setActionErr(null);
-    try {
-      await toggleReaction({ messageId: mid, userId: me._id, emoji });
-      setMenuMsgId(null);
-    } catch {
-      setActionErr("Could not update reaction.");
-    }
-  };
-
-  const sendFile = async (file: File) => {
-    if (!cid || !me || sending) return;
-    setSending(true);
-    setSendErr(false);
-    setActionErr(null);
-
-    try {
-      const uploadUrl = await generateUploadUrl({});
-      const uploadRes = await fetch(uploadUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": file.type || "application/octet-stream",
-        },
-        body: file,
-      });
-      if (!uploadRes.ok) throw new Error("Upload failed");
-
-      const { storageId } = (await uploadRes.json()) as { storageId: Id<"_storage"> };
-      const ok = await sendMessage({
-        conversationId: cid,
+        conversationId,
         senderId: me._id,
         content: text.trim(),
-        attachment: {
-          storageId,
-          fileName: file.name,
-          mimeType: file.type || "application/octet-stream",
-          size: file.size,
-        },
       });
-
-      if (!ok) throw new Error("Send failed");
-
+      if (!ok) {
+        setSendError("Failed to send message.");
+        return;
+      }
+      await setTyping({ conversationId, userId: me._id, isTyping: false });
       setText("");
-      setReplyToId(null);
       if (listRef.current) {
         listRef.current.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
       }
-      setShowNew(false);
+      setShowNewMessages(false);
     } catch {
-      setSendErr(true);
-      setActionErr("Could not upload file.");
+      setSendError("Failed to send message.");
     } finally {
       setSending(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
     }
-  };
-
-  const onPickFile = (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    void sendFile(file);
-  };
-
-  const resetPendingProfileImage = () => {
-    if (pendingProfilePreview) URL.revokeObjectURL(pendingProfilePreview);
-    setPendingProfilePreview(null);
-    setPendingProfileFile(null);
-    if (profileInputRef.current) profileInputRef.current.value = "";
-  };
-
-  const onPickProfileImage = (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file || !user) return;
-    if (!file.type.startsWith("image/")) {
-      setActionErr("Please select an image file.");
-      return;
-    }
-
-    setActionErr(null);
-    if (pendingProfilePreview) URL.revokeObjectURL(pendingProfilePreview);
-    const localUrl = URL.createObjectURL(file);
-    setPendingProfileFile(file);
-    setPendingProfilePreview(localUrl);
-    if (contactDrawer?.canEdit) {
-      setContactDrawer((prev) => (prev ? { ...prev, image: localUrl } : prev));
-    }
-  };
-
-  const onSaveProfileImage = async () => {
-    if (!pendingProfileFile || !user || profileSaving) return;
-    setActionErr(null);
-    setProfileSaving(true);
-    try {
-      const uploadUrl = await generateProfileUploadUrl({});
-      const uploadRes = await fetch(uploadUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": pendingProfileFile.type || "application/octet-stream",
-        },
-        body: pendingProfileFile,
-      });
-      if (!uploadRes.ok) throw new Error("Upload failed");
-
-      const { storageId } = (await uploadRes.json()) as { storageId: Id<"_storage"> };
-      const ok = await updateProfileImage({ clerkId: user.id, storageId });
-      if (!ok) throw new Error("Update failed");
-
-      resetPendingProfileImage();
-    } catch {
-      setActionErr("Could not update profile photo.");
-    } finally {
-      setProfileSaving(false);
-    }
-  };
-
-  const onCancelProfileImage = () => {
-    resetPendingProfileImage();
-    if (contactDrawer?.canEdit && me) {
-      setContactDrawer((prev) => (prev ? { ...prev, image: me.image } : prev));
-    }
-  };
-
-  const onUpdateProfileName = async (name: string) => {
-    if (!user) return false;
-    setActionErr(null);
-    try {
-      const ok = await updateProfileName({
-        clerkId: user.id,
-        name,
-      });
-      if (!ok) throw new Error("Update failed");
-      if (contactDrawer?.canEdit) {
-        setContactDrawer((prev) => (prev ? { ...prev, name: name.trim() } : prev));
-      }
-      return true;
-    } catch {
-      setActionErr("Could not update profile name.");
-      return false;
-    }
-  };
-
-  const addMoreReaction = async (mid: Id<"messages">) => {
-    const value = window.prompt(`Choose reaction: ${REACTIONS.join(" ")}`);
-    if (!value) return;
-    if (!REACTIONS.includes(value as (typeof REACTIONS)[number])) {
-      setActionErr("Use one of the allowed reactions.");
-      return;
-    }
-    await react(mid, value);
-  };
-
-  const openInfo = (mid: Id<"messages">) => {
-    setInfoMessageId(mid);
-    setMenuMsgId(null);
-  };
-
-  const startReply = (mid: Id<"messages">) => {
-    setReplyToId(mid);
-    setMenuMsgId(null);
-  };
-
-  const openForward = (mid: Id<"messages">) => {
-    setForwardMessageId(mid);
-    setForwardOpen(true);
-    setMenuMsgId(null);
-  };
-
-  const forwardToConversation = async (targetConversationId: Id<"conversations">) => {
-    if (!forwardMessage || !me) return;
-    await sendMessage({
-      conversationId: targetConversationId,
-      senderId: me._id,
-      content: forwardMessage.content,
-      forwarded: true,
-    });
-    setForwardOpen(false);
-    setForwardMessageId(null);
-  };
-
-  const forwardToUser = async (targetUser: UserDoc) => {
-    if (!me || !forwardMessage) return;
-    const targetConversationId = await getOrCreateConversation({
-      user1: me._id,
-      user2: targetUser._id,
-    });
-    await forwardToConversation(targetConversationId);
-  };
-
-  const onTogglePin = async (mid: Id<"messages">) => {
-    if (!me) return;
-    await togglePin({ messageId: mid, userId: me._id });
-    setMenuMsgId(null);
-  };
-
-  const onToggleStar = async (mid: Id<"messages">) => {
-    if (!me) return;
-    await toggleStar({ messageId: mid, userId: me._id });
-    setMenuMsgId(null);
-  };
-
-  const toggleSelectMode = (mid: Id<"messages">) => {
-    setSelectMode(true);
-    setSelectedMessageIds((prev) =>
-      prev.includes(mid) ? prev.filter((id) => id !== mid) : [...prev, mid]
-    );
-    setMenuMsgId(null);
-  };
-
-  const toggleSelectedMessage = (mid: Id<"messages">) => {
-    if (!selectMode) return;
-    setSelectedMessageIds((prev) =>
-      prev.includes(mid) ? prev.filter((id) => id !== mid) : [...prev, mid]
-    );
-  };
-
-  const cancelSelectMode = () => {
-    setSelectMode(false);
-    setSelectedMessageIds([]);
-  };
-
-  const copySelectedMessages = async () => {
-    if (selectedMessageIds.length === 0) return;
-    const selected = (messages || [])
-      .filter((message) => selectedMessageIds.includes(message._id))
-      .map((message) => message.content)
-      .join("\n");
-    await navigator.clipboard.writeText(selected);
-    cancelSelectMode();
-  };
-
-  const copyMessage = async (content: string) => {
-    try {
-      await navigator.clipboard.writeText(content);
-      setMenuMsgId(null);
-    } catch {
-      setActionErr("Could not copy message.");
-    }
-  };
-
-  const toggleGroupMember = (uid: Id<"users">) =>
-    setGroupMembers((prev) => (prev.includes(uid) ? prev.filter((x) => x !== uid) : [...prev, uid]));
-
-  const openContactDrawer = (payload: ContactDrawerData) => {
-    resetPendingProfileImage();
-    setContactDrawer(payload);
-  };
-  const closeContactDrawer = () => {
-    resetPendingProfileImage();
-    setContactDrawer(null);
-  };
-
-  const createGroup = async () => {
-    if (!me) return;
-    if (!groupName.trim()) {
-      setGroupErr("Enter a group name.");
-      return;
-    }
-    if (groupMembers.length < 2) {
-      setGroupErr("Select at least 2 members.");
-      return;
-    }
-
-    setGroupBusy(true);
-    setGroupErr(null);
-    try {
-      const id = await createGroupConversation({
-        creatorId: me._id,
-        memberIds: groupMembers,
-        groupName: groupName.trim(),
-      });
-      if (!id) {
-        setGroupErr("Could not create group.");
-        return;
-      }
-      setSidebarTab("groups");
-      setGroupOpen(false);
-      setGroupName("");
-      setGroupSearch("");
-      setGroupMembers([]);
-      openConversation(id);
-    } catch {
-      setGroupErr("Could not create group.");
-    } finally {
-      setGroupBusy(false);
-    }
-  };
-
-  const onRenameSelectedGroup = async () => {
-    if (!selectedConv || !me || !isGroupConversation(selectedConv)) return;
-    setRenameValue(selectedConv.groupName || "");
-    setRenameModalOpen(true);
-  };
-
-  const confirmRenameSelectedGroup = async () => {
-    if (!selectedConv || !me || !isGroupConversation(selectedConv) || groupActionBusy) return;
-    setGroupActionBusy(true);
-    const ok = await renameGroup({
-      conversationId: selectedConv._id,
-      userId: me._id,
-      groupName: renameValue,
-    });
-    if (!ok) {
-      setActionErr("Could not rename group.");
-    } else {
-      setRenameModalOpen(false);
-    }
-    setGroupActionBusy(false);
-  };
-
-  const onDeleteSelectedGroup = async () => {
-    if (!selectedConv || !me || !isGroupConversation(selectedConv)) return;
-    setDeleteModalOpen(true);
-  };
-
-  const confirmDeleteSelectedGroup = async () => {
-    if (!selectedConv || !me || !isGroupConversation(selectedConv) || groupActionBusy) return;
-    setGroupActionBusy(true);
-    const ok = await deleteGroup({
-      conversationId: selectedConv._id,
-      userId: me._id,
-    });
-    if (!ok) {
-      setActionErr("Could not delete group.");
-      setGroupActionBusy(false);
-      return;
-    }
-
-    setDeleteModalOpen(false);
-    setCid(null);
-    setMobileList(true);
-    setText("");
-    setReplyToId(null);
-    setMenuMsgId(null);
-    setShowNew(false);
-    setGroupActionBusy(false);
   };
 
   if (!isLoaded || !user) {
@@ -746,160 +262,160 @@ export default function ChatPage() {
   }
 
   const loadingData = users === undefined || me === undefined || (!!me && conversations === undefined);
-  const loadingMessages = !!cid && messages === undefined;
+  const loadingMessages = !!conversationId && messages === undefined;
 
   return (
     <div className="flex h-[100dvh] w-full flex-col overflow-hidden bg-[linear-gradient(165deg,#16222d_0%,#0f1a23_45%,#090f15_100%)] text-gray-100 md:grid md:grid-cols-[420px_1fr]">
       <Sidebar
-        activeTab={sidebarTab}
-        onTabChange={setSidebarTab}
         mobileList={mobileList}
-        me={me}
-        syncingProfile={syncingProfile}
-        syncError={syncError}
+        me={me ?? null}
+        syncingProfile={false}
+        syncError={null}
         currentUserMissing={me === null}
         onRetrySync={() => void syncCurrentUser()}
         search={search}
         onSearchChange={setSearch}
-        onOpenGroup={() => setGroupOpen(true)}
         loadingData={loadingData}
-        chatConversations={filteredChatConversations}
-        groupConversations={filteredGroupConversations}
+        conversations={filteredConversations}
         filteredUsers={filteredUsers}
-        allUsersCount={users?.length ?? 0}
-        selectedConversationId={cid}
+        selectedConversationId={conversationId}
         usersById={usersById}
-        title={title}
-        subtitle={subtitle}
-        isGroupConversation={isGroupConversation}
+        conversationTitle={conversationTitle}
+        conversationSubtitle={conversationSubtitle}
         onOpenConversation={openConversation}
         onOpenUserChat={(u) => void openUserChat(u)}
-        onOpenContactDrawer={openContactDrawer}
       />
 
-      <ChatMainPanel
-        mobileList={mobileList}
-        selectedConv={selectedConv}
-        me={me}
-        canManageSelectedGroup={canManageSelectedGroup}
-        usersById={usersById}
-        title={title}
-        subtitle={subtitle}
-        isGroupConversation={isGroupConversation}
-        typingText={typingText}
-        onBack={() => setMobileList(true)}
-        onOpenContactDrawer={openContactDrawer}
-        onRenameGroup={onRenameSelectedGroup}
-        onDeleteGroup={onDeleteSelectedGroup}
-        listRef={listRef}
-        loadingMessages={loadingMessages}
-        messages={messages}
-        messagesById={messagesById}
-        menuMsgId={menuMsgId}
-        onToggleMenu={setMenuMsgId}
-        selectMode={selectMode}
-        selectedMessageIds={selectedMessageIds}
-        onToggleSelectedMessage={toggleSelectedMessage}
-        onReact={react}
-        onAddMoreReaction={addMoreReaction}
-        onOpenInfo={openInfo}
-        onStartReply={startReply}
-        onCopyMessage={copyMessage}
-        onOpenForward={openForward}
-        onTogglePin={onTogglePin}
-        onToggleStar={onToggleStar}
-        onStartEdit={startEdit}
-        onToggleSelectMode={toggleSelectMode}
-        onOpenImagePreview={(url, name) => {
-          setImagePreviewUrl(url);
-          setImagePreviewName(name);
-        }}
-        onNearBottom={() => setShowNew(false)}
-        showNew={showNew}
-        onScrollToLatest={() => {
-          if (!listRef.current) return;
-          listRef.current.scrollTo({
-            top: listRef.current.scrollHeight,
-            behavior: "smooth",
-          });
-          setShowNew(false);
-        }}
-        onCopySelectedMessages={copySelectedMessages}
-        onCancelSelectMode={cancelSelectMode}
-        actionErr={actionErr}
-        sendErr={sendErr}
-        sendRetry={sendRetry}
-        onRetrySend={send}
-        onDismissSendError={() => {
-          setSendErr(false);
-          setSendRetry(null);
-        }}
-        replyMessage={replyMessage}
-        onClearReply={() => setReplyToId(null)}
-        editingMessageId={editingMessageId}
-        onCancelEdit={cancelEdit}
-        fileInputRef={fileInputRef}
-        onPickFile={onPickFile}
-        text={text}
-        onType={onType}
-        onSend={() => send()}
-        sending={sending}
-      />
+      <main
+        className={`${!mobileList ? "flex" : "hidden"} h-full min-h-0 flex-col bg-[radial-gradient(120%_90%_at_50%_0%,rgba(67,94,117,0.18),rgba(7,12,18,0)_60%),linear-gradient(180deg,rgba(17,28,37,0.72)_0%,rgba(8,14,20,0.92)_100%)] md:flex`}
+      >
+        {!selectedConversation || !me ? (
+          <div className="flex h-full items-center justify-center px-8 text-center text-[#8696a0]">
+            <p>Select a conversation or user to start chatting.</p>
+          </div>
+        ) : (
+          <>
+            <header className="flex items-center border-b border-white/10 bg-[#1a252d]/70 px-4 py-2.5 text-white backdrop-blur-xl md:px-5">
+              <button
+                onClick={() => setMobileList(true)}
+                className="mr-3 rounded-full p-2 text-[#d1d7db] hover:bg-white/10 md:hidden"
+                aria-label="Back"
+              >
+                <ArrowLeft className="h-5 w-5" />
+              </button>
+              <img
+                src={otherUser?.image || ""}
+                alt={otherUser?.name || "User"}
+                className="mr-3 h-10 w-10 rounded-full object-cover"
+              />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-lg font-semibold text-[#e9edef]">
+                  {conversationTitle(selectedConversation)}
+                </p>
+                {!typingText ? (
+                  <p className="truncate text-xs text-[#9bb5c3]">
+                    {conversationSubtitle(selectedConversation)}
+                  </p>
+                ) : (
+                  <div className="flex items-center gap-2 text-xs text-[#9bb5c3]">
+                    <span className="truncate">{typingText.replace(/\.\.\.$/, "")}</span>
+                    <span className="flex items-end gap-1">
+                      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-gray-400 [animation-delay:-0.2s]" />
+                      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-gray-400 [animation-delay:-0.1s]" />
+                      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-gray-400" />
+                    </span>
+                  </div>
+                )}
+              </div>
+            </header>
 
-      <ChatOverlays
-        infoMessage={infoMessage}
-        usersById={usersById}
-        formatTimestamp={formatTimestamp}
-        onCloseInfo={() => setInfoMessageId(null)}
-        forwardOpen={forwardOpen}
-        conversations={conversations || []}
-        users={users || []}
-        title={title}
-        onForwardToConversation={forwardToConversation}
-        onForwardToUser={forwardToUser}
-        onCloseForward={() => {
-          setForwardOpen(false);
-          setForwardMessageId(null);
-        }}
-        contactDrawer={contactDrawer}
-        onCloseContactDrawer={closeContactDrawer}
-        profileInputRef={profileInputRef}
-        onPickProfileImage={onPickProfileImage}
-        hasPendingProfileImage={!!pendingProfileFile}
-        profileSaving={profileSaving}
-        onSaveProfileImage={onSaveProfileImage}
-        onCancelProfileImage={onCancelProfileImage}
-        onUpdateProfileName={onUpdateProfileName}
-        imagePreviewUrl={imagePreviewUrl}
-        imagePreviewName={imagePreviewName}
-        onCloseImagePreview={() => setImagePreviewUrl(null)}
-        renameModalOpen={renameModalOpen}
-        renameValue={renameValue}
-        onRenameValueChange={setRenameValue}
-        onCloseRenameModal={() => setRenameModalOpen(false)}
-        onConfirmRenameGroup={confirmRenameSelectedGroup}
-        groupActionBusy={groupActionBusy}
-        deleteModalOpen={deleteModalOpen}
-        onCloseDeleteModal={() => setDeleteModalOpen(false)}
-        onConfirmDeleteGroup={confirmDeleteSelectedGroup}
-        groupOpen={groupOpen}
-        groupName={groupName}
-        onGroupNameChange={setGroupName}
-        groupSearch={groupSearch}
-        onGroupSearchChange={setGroupSearch}
-        filteredGroupUsers={filteredGroupUsers}
-        groupMembers={groupMembers}
-        onToggleGroupMember={toggleGroupMember}
-        groupErr={groupErr}
-        groupBusy={groupBusy}
-        onCloseGroupModal={() => {
-          setGroupOpen(false);
-          setGroupErr(null);
-          setGroupSearch("");
-        }}
-        onCreateGroup={createGroup}
-      />
+            <div
+              ref={listRef}
+              onScroll={(event) => nearBottom(event.currentTarget) && setShowNewMessages(false)}
+              className="relative min-h-0 flex-1 overflow-y-auto bg-[#0b141a] bg-[radial-gradient(circle_at_1px_1px,_rgba(255,255,255,0.04)_1px,_transparent_0)] [background-size:20px_20px] px-4 py-4"
+            >
+              <div className="mx-auto flex max-w-3xl flex-col gap-2">
+                {loadingMessages && (
+                  <div className="space-y-2">
+                    {Array.from({ length: 8 }).map((_, i) => (
+                      <div key={i} className={`flex ${i % 2 === 0 ? "justify-start" : "justify-end"}`}>
+                        <div className="h-14 w-48 animate-pulse rounded-xl bg-white/70" />
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {messages && messages.length === 0 && (
+                  <div className="mt-8 rounded-xl bg-white/80 px-4 py-3 text-center text-sm text-gray-600">
+                    No messages yet. Say hello to start this conversation.
+                  </div>
+                )}
+
+                {messages?.map((message) => {
+                  const mine = message.senderId === me._id;
+                  return (
+                    <div
+                      key={message._id}
+                      className={`flex ${mine ? "justify-end" : "justify-start"}`}
+                    >
+                      <div
+                        className={`max-w-[82%] rounded-2xl border px-3.5 py-2.5 text-sm shadow-[0_10px_28px_rgba(0,0,0,0.28)] md:max-w-[62%] ${
+                          mine
+                            ? "border-[#1f6f62]/80 bg-[linear-gradient(145deg,rgba(0,112,92,0.92),rgba(0,88,75,0.94))]"
+                            : "border-[#2a3942]/80 bg-[linear-gradient(145deg,rgba(34,47,57,0.9),rgba(26,37,46,0.92))]"
+                        }`}
+                      >
+                        <p className="break-words text-[#e9edef]">{message.content}</p>
+                        <p className="mt-1 text-right text-[11px] text-[#aebac1]">
+                          {formatTimestamp(message.createdAt)}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {showNewMessages && (
+              <button
+                onClick={() => {
+                  if (!listRef.current) return;
+                  listRef.current.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
+                  setShowNewMessages(false);
+                }}
+                className="mx-auto -mt-14 mb-2 rounded-full bg-[#25d366] px-4 py-2 text-sm font-medium text-white shadow-md"
+              >
+                ↓ New messages
+              </button>
+            )}
+
+            <footer className="border-t border-[#1f2c34] bg-[#202c33] p-3">
+              {sendError && <p className="mb-2 text-center text-xs text-red-400">{sendError}</p>}
+              <div className="mx-auto flex w-full max-w-3xl min-w-0 items-center gap-2">
+                <input
+                  value={text}
+                  onChange={(event) => onType(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" && !event.shiftKey) {
+                      event.preventDefault();
+                      void onSend();
+                    }
+                  }}
+                  placeholder="Type a message"
+                  className="min-w-0 flex-1 rounded-full border border-[#2b3942] bg-[#111b21] px-4 py-2 text-sm text-[#d1d7db] outline-none focus:border-[#00a884]"
+                />
+                <button
+                  onClick={() => void onSend()}
+                  disabled={sending || !text.trim()}
+                  className="shrink-0 rounded-full bg-[#128c7e] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-green-600 disabled:cursor-not-allowed disabled:bg-[#2f655d]"
+                >
+                  {sending ? "Sending..." : "Send"}
+                </button>
+              </div>
+            </footer>
+          </>
+        )}
+      </main>
     </div>
   );
 }
-
