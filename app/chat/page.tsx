@@ -226,7 +226,7 @@ export default function ChatPage() {
       if (typingTimeoutRef.current) {
         window.clearTimeout(typingTimeoutRef.current);
       }
-      void setTyping({ conversationId, userId: me._id, isTyping: false });
+      void setTyping({ conversationId, userId: me._id, isTyping: false }).catch(() => {});
     };
   }, [conversationId, me, setTyping]);
 
@@ -448,7 +448,7 @@ export default function ChatPage() {
                 }}
                 className="mx-auto -mt-14 mb-2 rounded-full bg-[#25d366] px-4 py-2 text-sm font-medium text-white shadow-md"
               >
-                ? New messages
+                {"\u2193 New messages"}
               </button>
             )}
 
