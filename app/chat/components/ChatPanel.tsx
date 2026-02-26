@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft } from "lucide-react";
+import { ArrowDown, ArrowLeft } from "lucide-react";
 import type { RefObject, UIEvent } from "react";
 import type { Id } from "../../../convex/_generated/dataModel";
 import type { ConvDoc, MessageUi, UserDoc } from "../lib/types";
@@ -56,7 +56,7 @@ export function ChatPanel({
 }: ChatPanelProps) {
   return (
     <main
-      className={`${!showMobileList ? "flex" : "hidden"} h-full min-h-0 flex-col bg-[radial-gradient(120%_90%_at_50%_0%,rgba(67,94,117,0.18),rgba(7,12,18,0)_60%),linear-gradient(180deg,rgba(17,28,37,0.72)_0%,rgba(8,14,20,0.92)_100%)] md:flex`}
+      className={`${!showMobileList ? "flex" : "hidden"} relative h-full min-h-0 flex-col bg-[radial-gradient(120%_90%_at_50%_0%,rgba(67,94,117,0.18),rgba(7,12,18,0)_60%),linear-gradient(180deg,rgba(17,28,37,0.72)_0%,rgba(8,14,20,0.92)_100%)] md:flex`}
     >
       {!selectedConversation || !me ? (
         <div className="flex h-full items-center justify-center px-8 text-center text-[#8696a0]">
@@ -154,9 +154,10 @@ export function ChatPanel({
           {showNewMessages && (
             <button
               onClick={onScrollToLatest}
-              className="mx-auto -mt-14 mb-2 rounded-full bg-[#25d366] px-4 py-2 text-sm font-medium text-white shadow-md"
+              aria-label="Scroll to latest messages"
+              className="absolute bottom-20 right-4 z-20 flex h-12 w-12 items-center justify-center rounded-full bg-[#202c33] text-white shadow-[0_8px_24px_rgba(0,0,0,0.45)] ring-1 ring-white/10 transition hover:bg-[#2a3942] md:bottom-24 md:right-6"
             >
-              {"\u2193 New messages"}
+              <ArrowDown className="h-6 w-6" />
             </button>
           )}
 

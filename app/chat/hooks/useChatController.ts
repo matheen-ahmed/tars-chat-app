@@ -90,7 +90,7 @@ export function useChatController(): Controller {
   const listRef = useRef<HTMLDivElement | null>(null);
   const typingTimeoutRef = useRef<number | null>(null);
   const prevLastMessageIdRef = useRef<Id<"messages"> | null>(null);
-  const didInitScrollRef = useRef(false);
+  const didInitConversationRef = useRef(false);
 
   const syncUser = useMutation(api.users.syncUser);
   const setOnline = useMutation(api.users.setOnlineStatus);
@@ -300,7 +300,7 @@ export function useChatController(): Controller {
 
   useEffect(() => {
     prevLastMessageIdRef.current = null;
-    didInitScrollRef.current = false;
+    didInitConversationRef.current = false;
   }, [conversationId]);
 
   useEffect(() => {
@@ -308,7 +308,7 @@ export function useChatController(): Controller {
     if (!messages) return;
     if (messages.length === 0) {
       prevLastMessageIdRef.current = null;
-      didInitScrollRef.current = true;
+      didInitConversationRef.current = true;
       setShowNewMessages(false);
       return;
     }
@@ -321,13 +321,12 @@ export function useChatController(): Controller {
       setIsNearBottomState(nearBottomNow);
     }
 
-    if (!didInitScrollRef.current) {
-      listRef.current.scrollTo({
-        top: listRef.current.scrollHeight,
-        behavior: "auto",
-      });
-      setShowNewMessages(false);
-      didInitScrollRef.current = true;
+    if (!didInitConversationRef.current) {
+      // Keep initial position (no force-scroll) and show down-arrow
+      // when the thread is not already at the bottom.
+      const hasOverflow = listRef.current.scrollHeight > listRef.current.clientHeight + 8;
+      setShowNewMessages(hasOverflow && !nearBottomNow);
+      didInitConversationRef.current = true;
     } else if (hasNewLatestMessage) {
       if (nearBottomNow) {
         listRef.current.scrollTo({
@@ -369,7 +368,7 @@ export function useChatController(): Controller {
     setShowNewMessages(false);
     setIsNearBottomState(true);
     prevLastMessageIdRef.current = null;
-    didInitScrollRef.current = false;
+    didInitConversationRef.current = false;
   }, [conversationId, directConversations]);
 
   const openConversation = useCallback(
@@ -402,7 +401,7 @@ export function useChatController(): Controller {
     setShowNewMessages(false);
     setIsNearBottomState(true);
     prevLastMessageIdRef.current = null;
-    didInitScrollRef.current = false;
+    didInitConversationRef.current = false;
   }, []);
 
   const onListScroll = useCallback((event: UIEvent<HTMLDivElement>) => {
