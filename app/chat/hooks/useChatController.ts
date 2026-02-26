@@ -89,7 +89,8 @@ export function useChatController(): Controller {
 
   const listRef = useRef<HTMLDivElement | null>(null);
   const typingTimeoutRef = useRef<number | null>(null);
-  const prevMessageCountRef = useRef(0);
+  const prevConversationIdRef = useRef<Id<"conversations"> | null>(null);
+  const prevLastMessageIdRef = useRef<Id<"messages"> | null>(null);
 
   const syncUser = useMutation(api.users.syncUser);
   const setOnline = useMutation(api.users.setOnlineStatus);
@@ -298,24 +299,43 @@ export function useChatController(): Controller {
   }, [conversationId, isConversationVisible, markAsRead, me, messageCount]);
 
   useEffect(() => {
-    if (!listRef.current || messageCount === 0) return;
-    const isInitialLoad = prevMessageCountRef.current === 0;
-    const hasNewMessages = messageCount > prevMessageCountRef.current;
-    prevMessageCountRef.current = messageCount;
-
-    if (isInitialLoad || (hasNewMessages && isNearBottomState)) {
-      listRef.current.scrollTo({
-        top: listRef.current.scrollHeight,
-        behavior: "smooth",
-      });
-      setShowNewMessages(false);
+    if (!listRef.current || !conversationId) return;
+    if (!messages || messages.length === 0) {
+      prevConversationIdRef.current = conversationId;
+      prevLastMessageIdRef.current = null;
       return;
     }
 
-    if (hasNewMessages && !isNearBottomState) {
-      setShowNewMessages(true);
+    const latestMessageId = messages[messages.length - 1]?._id ?? null;
+    const changedConversation = prevConversationIdRef.current !== conversationId;
+    const hasNewLatestMessage = prevLastMessageIdRef.current !== latestMessageId;
+    const nearBottomNow = nearBottom(listRef.current);
+
+    if (isNearBottomState !== nearBottomNow) {
+      setIsNearBottomState(nearBottomNow);
     }
-  }, [isNearBottomState, messageCount]);
+
+    if (changedConversation) {
+      listRef.current.scrollTo({
+        top: listRef.current.scrollHeight,
+        behavior: "auto",
+      });
+      setShowNewMessages(false);
+    } else if (hasNewLatestMessage) {
+      if (nearBottomNow) {
+        listRef.current.scrollTo({
+          top: listRef.current.scrollHeight,
+          behavior: "smooth",
+        });
+        setShowNewMessages(false);
+      } else {
+        setShowNewMessages(true);
+      }
+    }
+
+    prevConversationIdRef.current = conversationId;
+    prevLastMessageIdRef.current = latestMessageId;
+  }, [conversationId, isNearBottomState, messages]);
 
   useEffect(() => {
     if (!conversationId || !me) return;
@@ -342,7 +362,8 @@ export function useChatController(): Controller {
     setMessageText("");
     setShowNewMessages(false);
     setIsNearBottomState(true);
-    prevMessageCountRef.current = 0;
+    prevConversationIdRef.current = null;
+    prevLastMessageIdRef.current = null;
   }, [conversationId, directConversations]);
 
   const openConversation = useCallback(
@@ -374,7 +395,8 @@ export function useChatController(): Controller {
     setConversationId(null);
     setShowNewMessages(false);
     setIsNearBottomState(true);
-    prevMessageCountRef.current = 0;
+    prevConversationIdRef.current = null;
+    prevLastMessageIdRef.current = null;
   }, []);
 
   const onListScroll = useCallback((event: UIEvent<HTMLDivElement>) => {
@@ -398,6 +420,7 @@ export function useChatController(): Controller {
       top: listRef.current.scrollHeight,
       behavior: "smooth",
     });
+    setIsNearBottomState(true);
     setShowNewMessages(false);
   }, []);
 
