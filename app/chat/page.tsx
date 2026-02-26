@@ -33,7 +33,6 @@ export default function ChatPage() {
         usersById={controller.usersById}
         conversationTitle={controller.conversationTitle}
         conversationSubtitle={controller.conversationSubtitle}
-        typingNow={controller.typingNow}
         onOpenConversation={controller.openConversation}
         onOpenUserChat={controller.openUserChat}
       />

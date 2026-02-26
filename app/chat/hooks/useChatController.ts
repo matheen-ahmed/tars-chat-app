@@ -44,7 +44,6 @@ type Controller = {
   usersById: Map<string, UserDoc>;
   conversationTitle: (conversation: ConvDoc) => string;
   conversationSubtitle: (conversation: ConvDoc) => string;
-  typingNow: number;
   openConversation: (id: Id<"conversations">) => void;
   openUserChat: (user: UserDoc) => void;
   selectedConversation: ConvDoc | null;
@@ -78,7 +77,6 @@ export function useChatController(): Controller {
   const [showNewMessages, setShowNewMessages] = useState(false);
   const [isSyncingProfile, setIsSyncingProfile] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
-  const [typingNow, setTypingNow] = useState(() => Date.now());
   const [isNearBottomState, setIsNearBottomState] = useState(true);
   const [isDesktop, setIsDesktop] = useState(false);
   const [isWindowActive, setIsWindowActive] = useState(() =>
@@ -240,18 +238,11 @@ export function useChatController(): Controller {
 
   const typingText = useMemo(() => {
     if (!selectedConversation?.typing?.isTyping || !me) return "";
-    if (typingNow - selectedConversation.typing.updatedAt > TYPING_IDLE_MS)
-      return "";
     if (selectedConversation.typing.userId === me._id) return "";
 
     const typer = usersById.get(String(selectedConversation.typing.userId));
     return `${typer?.name || "Someone"} is typing...`;
-  }, [me, selectedConversation, typingNow, usersById]);
-
-  useEffect(() => {
-    const timer = window.setInterval(() => setTypingNow(Date.now()), 500);
-    return () => window.clearInterval(timer);
-  }, []);
+  }, [me, selectedConversation, usersById]);
 
   useEffect(() => {
     const media = window.matchMedia(DESKTOP_MEDIA_QUERY);
@@ -521,7 +512,6 @@ export function useChatController(): Controller {
     usersById,
     conversationTitle,
     conversationSubtitle,
-    typingNow,
     openConversation,
     openUserChat: (profile) => void openUserChat(profile),
     selectedConversation,

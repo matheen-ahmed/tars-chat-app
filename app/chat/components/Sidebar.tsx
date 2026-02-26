@@ -4,7 +4,6 @@ import { Search } from "lucide-react";
 import { UserButton } from "@clerk/nextjs";
 import Image from "next/image";
 import { AvatarWithPresence } from "./AvatarWithPresence";
-import { TYPING_STALE_MS } from "../lib/constants";
 import { formatTimestamp } from "../lib/utils";
 import { getOtherParticipantId } from "../lib/conversationView";
 import type { ConvDoc, UserDoc } from "../lib/types";
@@ -26,7 +25,6 @@ type SidebarProps = {
   usersById: Map<string, UserDoc>;
   conversationTitle: (conversation: ConvDoc) => string;
   conversationSubtitle: (conversation: ConvDoc) => string;
-  typingNow: number;
   onOpenConversation: (id: Id<"conversations">) => void;
   onOpenUserChat: (user: UserDoc) => void;
 };
@@ -47,7 +45,6 @@ export function Sidebar({
   usersById,
   conversationTitle,
   conversationSubtitle,
-  typingNow,
   onOpenConversation,
   onOpenUserChat,
 }: SidebarProps) {
@@ -140,8 +137,7 @@ export function Sidebar({
               const isTyping =
                 !!conversation.typing?.isTyping &&
                 !!me &&
-                conversation.typing.userId !== me._id &&
-                typingNow - conversation.typing.updatedAt <= TYPING_STALE_MS;
+                conversation.typing.userId !== me._id;
               const hasUnread = conversation.unreadCount > 0;
               return (
                 <button
