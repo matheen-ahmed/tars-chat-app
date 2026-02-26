@@ -4,13 +4,12 @@ import type { Id } from "./_generated/dataModel";
 import {
   buildConversationKey,
   defaultLastSeen,
+  type LastSeenEntry,
   mergeConversationsById,
   normalizeParticipants,
   safeTwoParticipants,
   toNormalizedLegacyConversation,
-  type LastSeenEntry,
-  upsertLastSeen,
-} from "./lib/conversationUtils";
+} from "./utils/conversationUtils";
 
 const TYPING_TIMEOUT_MS = 2_000;
 
@@ -87,59 +86,6 @@ export const getOrCreateConversation = mutation({
   },
 });
 
-export const getMessages = query({
-  args: {
-    conversationId: v.id("conversations"),
-  },
-  handler: async (ctx, args) => {
-    const messages = await ctx.db
-      .query("messages")
-      .withIndex("by_conversation", (q) => q.eq("conversationId", args.conversationId))
-      .collect();
-
-    return messages.sort((a, b) => a.createdAt - b.createdAt);
-  },
-});
-
-export const sendMessage = mutation({
-  args: {
-    conversationId: v.id("conversations"),
-    senderId: v.id("users"),
-    content: v.string(),
-  },
-  handler: async (ctx, args) => {
-    const conversation = await ctx.db.get(args.conversationId);
-    if (!conversation) return null;
-    if (!conversation.participants.includes(args.senderId)) return null;
-
-    const trimmedContent = args.content.trim();
-    if (!trimmedContent) return null;
-
-    const now = Date.now();
-
-    const messageId = await ctx.db.insert("messages", {
-      conversationId: conversation._id,
-      senderId: args.senderId,
-      content: trimmedContent,
-      createdAt: now,
-      seenBy: [args.senderId],
-    });
-
-    await ctx.db.patch(conversation._id, {
-      lastMessage: trimmedContent,
-      lastMessageTime: now,
-      lastSeen: upsertLastSeen(conversation.lastSeen as LastSeenEntry[] | undefined, args.senderId, now),
-      typing: {
-        userId: args.senderId,
-        isTyping: false,
-        updatedAt: now,
-      },
-    });
-
-    return messageId;
-  },
-});
-
 export const getConversations = query({
   args: {
     userId: v.id("users"),
@@ -183,7 +129,7 @@ export const getConversations = query({
           .collect();
 
         const unreadCount = messages.filter(
-          (message) => message.senderId !== args.userId && message.createdAt > lastSeenTimestamp
+          (message) => message.senderId !== args.userId && message.createdAt > lastSeenTimestamp,
         ).length;
 
         const typingExpired =
@@ -201,7 +147,7 @@ export const getConversations = query({
               : conversation.typing,
           unreadCount,
         };
-      })
+      }),
     );
 
     return results.sort((a, b) => (b.lastMessageTime ?? 0) - (a.lastMessageTime ?? 0));
@@ -217,7 +163,7 @@ export const backfillConversationIndexes = mutation({
       if (conversation.participants.length !== 2) continue;
       const { participantA, participantB } = normalizeParticipants(
         conversation.participants[0],
-        conversation.participants[1]
+        conversation.participants[1],
       );
 
       await ctx.db.patch(conversation._id, {
@@ -283,45 +229,6 @@ export const backfillConversationsForUser = mutation({
   },
 });
 
-export const markAsRead = mutation({
-  args: {
-    conversationId: v.id("conversations"),
-    userId: v.id("users"),
-  },
-  handler: async (ctx, args) => {
-    const conversation = await ctx.db.get(args.conversationId);
-    if (!conversation) return;
-
-    const now = Math.max(Date.now(), conversation.lastMessageTime ?? 0);
-    const updatedLastSeen = upsertLastSeen(
-      conversation.lastSeen as LastSeenEntry[] | undefined,
-      args.userId,
-      now
-    );
-
-    await ctx.db.patch(args.conversationId, {
-      lastSeen: updatedLastSeen,
-    });
-  },
-});
-
-export const setTyping = mutation({
-  args: {
-    conversationId: v.id("conversations"),
-    userId: v.id("users"),
-    isTyping: v.boolean(),
-  },
-  handler: async (ctx, args) => {
-    const conversation = await ctx.db.get(args.conversationId);
-    if (!conversation) return;
-    if (!conversation.participants.includes(args.userId)) return;
-
-    await ctx.db.patch(conversation._id, {
-      typing: {
-        userId: args.userId,
-        isTyping: args.isTyping,
-        updatedAt: Date.now(),
-      },
-    });
-  },
-});
+// Backward-compatible exports; canonical modules are ./messages and ./presence.
+export { getMessages, markAsRead, sendMessage } from "./messages";
+export { setTyping } from "./presence";

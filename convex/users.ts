@@ -1,7 +1,6 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
-
-const ONLINE_WINDOW_MS = 30_000;
+import { isUserOnline } from "./utils/presenceUtils";
 
 export const syncUser = mutation({
   args: {
@@ -58,7 +57,7 @@ export const getUsers = query({
       .filter((user) => user._id !== currentUser._id)
       .map((user) => ({
         ...user,
-        online: user.online && !!user.lastActiveAt && now - user.lastActiveAt < ONLINE_WINDOW_MS,
+        online: isUserOnline(user.online, user.lastActiveAt, now),
       }));
   },
 });
@@ -75,41 +74,5 @@ export const getCurrentUser = query({
   },
 });
 
-export const setOnlineStatus = mutation({
-  args: {
-    clerkId: v.string(),
-    online: v.boolean(),
-  },
-  handler: async (ctx, args) => {
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_clerkId", (q) => q.eq("clerkId", args.clerkId))
-      .unique();
-
-    if (!user) return;
-
-    await ctx.db.patch(user._id, {
-      online: args.online,
-      lastActiveAt: Date.now(),
-    });
-  },
-});
-
-export const heartbeat = mutation({
-  args: {
-    clerkId: v.string(),
-  },
-  handler: async (ctx, args) => {
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_clerkId", (q) => q.eq("clerkId", args.clerkId))
-      .unique();
-
-    if (!user) return;
-
-    await ctx.db.patch(user._id, {
-      online: true,
-      lastActiveAt: Date.now(),
-    });
-  },
-});
+// Backward-compatible exports; canonical module is ./presence.
+export { heartbeat, setOnlineStatus } from "./presence";
