@@ -11,8 +11,6 @@ import {
   toNormalizedLegacyConversation,
 } from "./utils/conversationUtils";
 
-const TYPING_TIMEOUT_MS = 2_000;
-
 export const getOrCreateConversation = mutation({
   args: {
     user1: v.id("users"),
@@ -132,19 +130,9 @@ export const getConversations = query({
           (message) => message.senderId !== args.userId && message.createdAt > lastSeenTimestamp,
         ).length;
 
-        const typingExpired =
-          conversation.typing?.isTyping && now - conversation.typing.updatedAt > TYPING_TIMEOUT_MS;
-
         return {
           ...conversation,
-          typing:
-            typingExpired && conversation.typing
-              ? {
-                  userId: conversation.typing.userId,
-                  isTyping: false,
-                  updatedAt: conversation.typing.updatedAt,
-                }
-              : conversation.typing,
+          typing: conversation.typing,
           unreadCount,
         };
       }),
