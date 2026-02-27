@@ -1,36 +1,90 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# QuickChat (Next.js + Convex + Clerk)
 
-## Getting Started
+QuickChat is a real-time one-to-one chat application built with Next.js App Router, Convex, and Clerk authentication. It includes presence indicators, typing status, unread tracking, and a mobile-friendly chat interface.
 
-First, run the development server:
+## What this project does
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+- Authenticates users with Clerk (sign up, sign in, sign out)
+- Syncs authenticated users into Convex user records
+- Lets users start direct conversations from the user list
+- Sends and receives messages in real time
+- Shows online/offline presence and last active status
+- Shows typing indicators and unread message counts
+- Marks messages as read when a chat is visible
+- Supports responsive chat layout for desktop and mobile
+
+## Tech stack
+
+- Next.js 16 (App Router)
+- React 19 + TypeScript
+- Convex (database + realtime queries/mutations)
+- Clerk (authentication)
+- Tailwind CSS 4
+- Framer Motion + Lucide icons
+
+## Project structure
+
+```text
+app/
+  page.tsx                 # Landing page (signed-in/signed-out states)
+  layout.tsx               # Clerk + Convex providers
+  chat/
+    page.tsx               # Main chat screen
+    hooks/useChatController.ts
+    components/            # Sidebar, chat panel, avatars, presence UI
+convex/
+  schema.ts                # users, conversations, messages tables
+  users.ts                 # user sync + online/heartbeat
+  conversations.ts         # conversation + messaging logic
+  presence.ts              # presence-related backend actions
+proxy.ts                   # Clerk middleware route protection
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Environment variables
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Create a `.env.local` file in the project root:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```env
+# Convex
+NEXT_PUBLIC_CONVEX_URL=your_convex_deployment_url
 
-## Learn More
+# Clerk (required by Clerk middleware/provider)
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=your_publishable_key
+CLERK_SECRET_KEY=your_secret_key
 
-To learn more about Next.js, take a look at the following resources:
+# Optional: admin behavior in convex/admin.ts
+ADMIN_CLERK_ID=your_clerk_user_id
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Getting started
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+1. Install dependencies:
+```bash
+npm install
+```
 
-## Deploy on Vercel
+2. Configure environment variables in `.env.local`.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+3. Start the Next.js app:
+```bash
+npm run dev
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+4. Open:
+```text
+http://localhost:3000
+```
+
+## Available scripts
+
+- `npm run dev` - Start development server (webpack mode)
+- `npm run dev:turbo` - Start development server (turbopack)
+- `npm run build` - Build for production
+- `npm run start` - Run production server
+- `npm run lint` - Run ESLint
+
+## Notes
+
+- If `NEXT_PUBLIC_CONVEX_URL` is missing/invalid, the app shows a configuration error screen.
+- Chat functionality depends on Convex functions and schema in the `convex/` directory.
+- This codebase currently focuses on direct (1:1) conversations.
