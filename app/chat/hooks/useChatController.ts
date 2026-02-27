@@ -18,10 +18,12 @@ import {
   DESKTOP_MEDIA_QUERY,
   PRESENCE_PING_MS,
   TYPING_IDLE_MS,
+  TYPING_STALE_MS,
 } from "../lib/constants";
 import {
   buildUsersById,
   filterDirectConversations,
+  getOtherParticipantId,
   getConversationSubtitle,
   getConversationTitle,
 } from "../lib/conversationView";
@@ -211,6 +213,15 @@ export function useChatController(): Controller {
     );
   }, [conversationTitle, directConversations, search]);
 
+  const visibleConversations = useMemo(() => {
+    if (!me) return filteredConversations;
+    return filteredConversations.filter((conversation) => {
+      const otherId = getOtherParticipantId(conversation, me._id);
+      if (!otherId) return false;
+      return usersById.has(String(otherId));
+    });
+  }, [filteredConversations, me, usersById]);
+
   const filteredUsers = useMemo(() => {
     const query = search.trim().toLowerCase();
     if (!users) return [];
@@ -239,6 +250,7 @@ export function useChatController(): Controller {
   const typingText = useMemo(() => {
     if (!selectedConversation?.typing?.isTyping || !me) return "";
     if (selectedConversation.typing.userId === me._id) return "";
+    if (Date.now() - selectedConversation.typing.updatedAt > TYPING_STALE_MS) return "";
 
     const typer = usersById.get(String(selectedConversation.typing.userId));
     return `${typer?.name || "Someone"} is typing...`;
@@ -506,7 +518,7 @@ export function useChatController(): Controller {
     retrySync: () => void syncCurrentUser(),
     isLoadingData,
     isLoadingMessages,
-    conversations: filteredConversations,
+    conversations: visibleConversations,
     filteredUsers,
     selectedConversationId: conversationId,
     usersById,

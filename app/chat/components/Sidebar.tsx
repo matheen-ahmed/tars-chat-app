@@ -3,11 +3,13 @@
 import { Search } from "lucide-react";
 import { UserButton } from "@clerk/nextjs";
 import Image from "next/image";
+import { useEffect, useState } from "react";
 import { AvatarWithPresence } from "./AvatarWithPresence";
 import { formatTimestamp } from "../lib/utils";
 import { getOtherParticipantId } from "../lib/conversationView";
 import type { ConvDoc, UserDoc } from "../lib/types";
 import type { Id } from "../../../convex/_generated/dataModel";
+import { TYPING_STALE_MS } from "../lib/constants";
 
 type SidebarProps = {
   mobileList: boolean;
@@ -49,6 +51,12 @@ export function Sidebar({
   onOpenUserChat,
 }: SidebarProps) {
   const hasSearch = search.trim().length > 0;
+  const [nowMs, setNowMs] = useState(() => Date.now());
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNowMs(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   return (
     <aside
@@ -137,7 +145,8 @@ export function Sidebar({
               const isTyping =
                 !!conversation.typing?.isTyping &&
                 !!me &&
-                conversation.typing.userId !== me._id;
+                conversation.typing.userId !== me._id &&
+                nowMs - conversation.typing.updatedAt <= TYPING_STALE_MS;
               const hasUnread = conversation.unreadCount > 0;
               return (
                 <button

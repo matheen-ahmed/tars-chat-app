@@ -42,5 +42,7 @@ export default defineSchema({
       content: v.string(),
       createdAt: v.number(),
       seenBy: v.array(v.id("users")),
-    }).index("by_conversation", ["conversationId"]),
+    })
+      .index("by_conversation", ["conversationId"])
+      .index("by_conversation_createdAt", ["conversationId", "createdAt"]),
 });

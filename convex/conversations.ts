@@ -1,4 +1,9 @@
-import { mutation, query } from "./_generated/server";
+import {
+  mutation,
+  query,
+  type MutationCtx,
+  type QueryCtx,
+} from "./_generated/server";
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
 import {
@@ -11,12 +16,29 @@ import {
   toNormalizedLegacyConversation,
 } from "./utils/conversationUtils";
 
+async function requireAuthUser(ctx: QueryCtx | MutationCtx) {
+  const identity = await ctx.auth.getUserIdentity();
+  if (!identity) throw new Error("Unauthorized");
+
+  const me = await ctx.db
+    .query("users")
+    .withIndex("by_clerkId", (q) => q.eq("clerkId", identity.subject))
+    .unique();
+  if (!me) throw new Error("User profile not found");
+  return me;
+}
+
 export const getOrCreateConversation = mutation({
   args: {
     user1: v.id("users"),
     user2: v.id("users"),
   },
   handler: async (ctx, args) => {
+    const me = await requireAuthUser(ctx);
+    if (args.user1 !== me._id) {
+      throw new Error("Forbidden");
+    }
+
     const { participantA, participantB } = normalizeParticipants(args.user1, args.user2);
     const conversationKey = buildConversationKey(args.user1, args.user2);
 
@@ -89,6 +111,11 @@ export const getConversations = query({
     userId: v.id("users"),
   },
   handler: async (ctx, args) => {
+    const me = await requireAuthUser(ctx);
+    if (args.userId !== me._id) {
+      throw new Error("Forbidden");
+    }
+
     const [asParticipantA, asParticipantB] = await Promise.all([
       ctx.db
         .query("conversations")
@@ -114,20 +141,21 @@ export const getConversations = query({
       myConversations = legacyMine.map(toNormalizedLegacyConversation);
     }
 
-    const now = Date.now();
     const results = await Promise.all(
       myConversations.map(async (conversation) => {
         const lastSeenEntries = conversation.lastSeen ?? [];
         const seenRecord = lastSeenEntries.find((entry) => entry.userId === args.userId);
         const lastSeenTimestamp = seenRecord?.timestamp ?? 0;
 
-        const messages = await ctx.db
+        const unreadMessages = await ctx.db
           .query("messages")
-          .withIndex("by_conversation", (q) => q.eq("conversationId", conversation._id))
+          .withIndex("by_conversation_createdAt", (q) =>
+            q.eq("conversationId", conversation._id).gt("createdAt", lastSeenTimestamp),
+          )
           .collect();
 
-        const unreadCount = messages.filter(
-          (message) => message.senderId !== args.userId && message.createdAt > lastSeenTimestamp,
+        const unreadCount = unreadMessages.filter(
+          (message) => message.senderId !== args.userId,
         ).length;
 
         return {
@@ -145,6 +173,8 @@ export const getConversations = query({
 export const backfillConversationIndexes = mutation({
   args: {},
   handler: async (ctx) => {
+    await requireAuthUser(ctx);
+
     const conversations = await ctx.db.query("conversations").collect();
 
     for (const conversation of conversations) {
@@ -177,6 +207,11 @@ export const backfillConversationsForUser = mutation({
     userId: v.id("users"),
   },
   handler: async (ctx, args) => {
+    const me = await requireAuthUser(ctx);
+    if (args.userId !== me._id) {
+      throw new Error("Forbidden");
+    }
+
     const conversations = await ctx.db.query("conversations").collect();
     let patched = 0;
 

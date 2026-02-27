@@ -28,4 +28,9 @@ export const getConversationSubtitle = (
 };
 
 export const filterDirectConversations = (conversations: ConvDoc[] | undefined) =>
-  (conversations || []).filter((conversation) => conversation.participants.length === 2);
+  (conversations || []).filter((conversation) => {
+    if (conversation.participants.length !== 2) return false;
+    const [a, b] = conversation.participants;
+    if (!a || !b) return false;
+    return a !== b;
+  });

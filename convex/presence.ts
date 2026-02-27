@@ -1,5 +1,11 @@
-import { mutation } from "./_generated/server";
+import { mutation, type MutationCtx } from "./_generated/server";
 import { v } from "convex/values";
+
+async function requireAuthClerkId(ctx: MutationCtx) {
+  const identity = await ctx.auth.getUserIdentity();
+  if (!identity) throw new Error("Unauthorized");
+  return identity.subject;
+}
 
 export const setOnlineStatus = mutation({
   args: {
@@ -7,9 +13,14 @@ export const setOnlineStatus = mutation({
     online: v.boolean(),
   },
   handler: async (ctx, args) => {
+    const authClerkId = await requireAuthClerkId(ctx);
+    if (args.clerkId !== authClerkId) {
+      throw new Error("Forbidden");
+    }
+
     const user = await ctx.db
       .query("users")
-      .withIndex("by_clerkId", (q) => q.eq("clerkId", args.clerkId))
+      .withIndex("by_clerkId", (q) => q.eq("clerkId", authClerkId))
       .unique();
 
     if (!user) return;
@@ -26,9 +37,14 @@ export const heartbeat = mutation({
     clerkId: v.string(),
   },
   handler: async (ctx, args) => {
+    const authClerkId = await requireAuthClerkId(ctx);
+    if (args.clerkId !== authClerkId) {
+      throw new Error("Forbidden");
+    }
+
     const user = await ctx.db
       .query("users")
-      .withIndex("by_clerkId", (q) => q.eq("clerkId", args.clerkId))
+      .withIndex("by_clerkId", (q) => q.eq("clerkId", authClerkId))
       .unique();
 
     if (!user) return;
@@ -47,6 +63,19 @@ export const setTyping = mutation({
     isTyping: v.boolean(),
   },
   handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthorized");
+
+    const me = await ctx.db
+      .query("users")
+      .withIndex("by_clerkId", (q) => q.eq("clerkId", identity.subject))
+      .unique();
+    if (!me) throw new Error("User profile not found");
+
+    if (args.userId !== me._id) {
+      throw new Error("Forbidden");
+    }
+
     const conversation = await ctx.db.get(args.conversationId);
     if (!conversation) return;
     if (!conversation.participants.includes(args.userId)) return;

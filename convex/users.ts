@@ -1,6 +1,12 @@
-import { mutation, query } from "./_generated/server";
+import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
 import { v } from "convex/values";
 import { isUserOnline } from "./utils/presenceUtils";
+
+async function requireAuthClerkId(ctx: QueryCtx | MutationCtx) {
+  const identity = await ctx.auth.getUserIdentity();
+  if (!identity) throw new Error("Unauthorized");
+  return identity.subject;
+}
 
 export const syncUser = mutation({
   args: {
@@ -10,14 +16,19 @@ export const syncUser = mutation({
     image: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    const authClerkId = await requireAuthClerkId(ctx);
+    if (args.clerkId !== authClerkId) {
+      throw new Error("Forbidden");
+    }
+
     const existing = await ctx.db
       .query("users")
-      .withIndex("by_clerkId", (q) => q.eq("clerkId", args.clerkId))
+      .withIndex("by_clerkId", (q) => q.eq("clerkId", authClerkId))
       .unique();
 
     if (!existing) {
       await ctx.db.insert("users", {
-        clerkId: args.clerkId,
+        clerkId: authClerkId,
         name: args.name,
         email: args.email,
         image: args.image ?? "",
@@ -43,9 +54,14 @@ export const getUsers = query({
     clerkId: v.string(),
   },
   handler: async (ctx, args) => {
+    const authClerkId = await requireAuthClerkId(ctx);
+    if (args.clerkId !== authClerkId) {
+      throw new Error("Forbidden");
+    }
+
     const currentUser = await ctx.db
       .query("users")
-      .withIndex("by_clerkId", (q) => q.eq("clerkId", args.clerkId))
+      .withIndex("by_clerkId", (q) => q.eq("clerkId", authClerkId))
       .unique();
 
     if (!currentUser) return [];
@@ -67,9 +83,14 @@ export const getCurrentUser = query({
     clerkId: v.string(),
   },
   handler: async (ctx, args) => {
+    const authClerkId = await requireAuthClerkId(ctx);
+    if (args.clerkId !== authClerkId) {
+      throw new Error("Forbidden");
+    }
+
     return await ctx.db
       .query("users")
-      .withIndex("by_clerkId", (q) => q.eq("clerkId", args.clerkId))
+      .withIndex("by_clerkId", (q) => q.eq("clerkId", authClerkId))
       .unique();
   },
 });
